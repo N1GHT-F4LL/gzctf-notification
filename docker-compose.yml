@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  gzctf-discord-bot:
+    build: .
+    container_name: gzctf-discord-bot
+    restart: unless-stopped
+    environment:
+      # GZCTF Configuration
+      - GZCTF_BASE_URL=${GZCTF_BASE_URL:-http://localhost:8080}
+      - GZCTF_API_TOKEN=${GZCTF_API_TOKEN}
+      - GZCTF_USERNAME=${GZCTF_USERNAME}
+      - GZCTF_PASSWORD=${GZCTF_PASSWORD}
+      
+      # Discord Configuration
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      
+      # Bot Configuration
+      - GAME_ID=${GAME_ID}
+      - POLL_INTERVAL=${POLL_INTERVAL:-30}
+      - ENABLE_NOTICES=${ENABLE_NOTICES:-true}
+      - ENABLE_EVENTS=${ENABLE_EVENTS:-true}
+    
+    volumes:
+      - ./logs:/app/logs
+    
+    networks:
+      - gzctf-network
+
+networks:
+  gzctf-network:
+    driver: bridge 
