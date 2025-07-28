@@ -211,7 +211,7 @@ class NotificationFormatter:
             # Create embed
             embed = discord.Embed(
                 title=f"{emoji} {self._format_event_title(event_type)}",
-                description=self._format_event_content(event_type, values),
+                description=self._format_event_content(event_type, values, event),
                 color=color,
                 timestamp=self._timestamp_to_datetime(time)
             )
@@ -287,7 +287,7 @@ class NotificationFormatter:
         else:
             return " ".join(values)
     
-    def _format_event_content(self, event_type: str, values: list) -> str:
+    def _format_event_content(self, event_type: str, values: list, event: Dict[str, Any] = None) -> str:
         """Format event content based on type and values"""
         if not values:
             return "No additional information available."
@@ -296,8 +296,8 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 result = values[1]
-                user = event.get('user', 'Unknown')
-                team = event.get('team', 'Unknown')
+                user = event.get('user', 'Unknown') if event else 'Unknown'
+                team = event.get('team', 'Unknown') if event else 'Unknown'
                 
                 if result == "Accepted":
                     result_message = "✅ **ACCEPTED!** - *Excellent work!* ✅"
@@ -327,8 +327,8 @@ class NotificationFormatter:
                 return random.choice(self.container_destroy_messages).format(challenge="Unknown Challenge")
         
         elif event_type == "CheatDetected":
-            user = event.get('user', 'Unknown')
-            team = event.get('team', 'Unknown')
+            user = event.get('user', 'Unknown') if event else 'Unknown'
+            team = event.get('team', 'Unknown') if event else 'Unknown'
             if values:
                 return random.choice(self.cheat_detected_messages).format(
                     user=user, team=team
