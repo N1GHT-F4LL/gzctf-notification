@@ -60,6 +60,33 @@ class NotificationFormatter:
             "🎯 **OUTSTANDING!** 🎯\n\n**{team}** has seized the **THIRD BLOOD** on **{challenge}**!\n\n🏆 *A champion's performance!* 🏆"
         ]
         
+        # Random messages for other notification types
+        self.new_hint_messages = [
+            "💡 **NEW HINT AVAILABLE!** 💡\n\nA new hint has been released for **{challenge}**!\n\n🔍 *Time to dig deeper!* 🔍",
+            "🎯 **HINT DROPPED!** 🎯\n\nFresh hint available for **{challenge}**!\n\n💭 *A new perspective awaits!* 💭",
+            "🌟 **HINT UNLOCKED!** 🌟\n\nNew hint revealed for **{challenge}**!\n\n🔐 *The path becomes clearer!* 🔐",
+            "✨ **HINT REVEALED!** ✨\n\nA helpful hint for **{challenge}** is now available!\n\n🎪 *The mystery deepens!* 🎪",
+            "🔥 **HINT ALERT!** 🔥\n\nNew hint dropped for **{challenge}**!\n\n⚡ *Light bulb moment incoming!* ⚡",
+            "💎 **HINT DISCOVERED!** 💎\n\nFresh hint for **{challenge}** awaits!\n\n🎨 *Creativity meets opportunity!* 🎨",
+            "🚀 **HINT LAUNCHED!** 🚀\n\nNew hint available for **{challenge}**!\n\n💫 *The stars align for success!* 💫",
+            "🎊 **HINT RELEASED!** 🎊\n\nA new hint for **{challenge}** is here!\n\n🎭 *The plot thickens!* 🎭",
+            "⚡ **HINT ACTIVATED!** ⚡\n\nFresh hint dropped for **{challenge}**!\n\n🔮 *The future looks bright!* 🔮",
+            "🏆 **HINT UNVEILED!** 🏆\n\nNew hint revealed for **{challenge}**!\n\n👑 *Knowledge is power!* 👑"
+        ]
+        
+        self.new_challenge_messages = [
+            "🎯 **NEW CHALLENGE RELEASED!** 🎯\n\n**{challenge}** is now available!\n\n🚀 *Ready to conquer?* 🚀",
+            "🌟 **CHALLENGE UNLOCKED!** 🌟\n\n**{challenge}** has been released!\n\n💪 *Time to test your skills!* 💪",
+            "🔥 **CHALLENGE LAUNCHED!** 🔥\n\n**{challenge}** is now live!\n\n⚡ *The competition heats up!* ⚡",
+            "✨ **CHALLENGE REVEALED!** ✨\n\n**{challenge}** is ready for challengers!\n\n🎪 *The stage is set!* 🎪",
+            "💎 **CHALLENGE DISCOVERED!** 💎\n\n**{challenge}** awaits brave souls!\n\n🏅 *Glory awaits the worthy!* 🏅",
+            "🎊 **CHALLENGE ACTIVATED!** 🎊\n\n**{challenge}** is now available!\n\n🎭 *The adventure begins!* 🎭",
+            "⚡ **CHALLENGE UNVEILED!** ⚡\n\n**{challenge}** has been released!\n\n💫 *Destiny calls!* 💫",
+            "🏆 **CHALLENGE DROPPED!** 🏆\n\n**{challenge}** is now live!\n\n👑 *The throne awaits!* 👑",
+            "🚀 **CHALLENGE LAUNCHED!** 🚀\n\n**{challenge}** is ready for action!\n\n🌟 *The stars align!* 🌟",
+            "🎯 **CHALLENGE RELEASED!** 🎯\n\n**{challenge}** awaits challengers!\n\n💎 *Diamonds are formed under pressure!* 💎"
+        ]
+        
         self.event_colors = {
             "FlagSubmit": 0x00FF00,    # Green
             "ContainerStart": 0x00CCFF, # Light Blue
@@ -85,6 +112,59 @@ class NotificationFormatter:
             "CheatDetected": "⚠️",
             "Normal": "📝"
         }
+        
+        # Random messages for events
+        self.flag_submit_messages = [
+            "🚩 **FLAG SUBMISSION!** 🚩\n\n**{user}** from **{team}** submitted a flag for **{challenge}**!\n\n{result_message}",
+            "🎯 **FLAG ATTEMPT!** 🎯\n\n**{user}** from **{team}** tried a flag on **{challenge}**!\n\n{result_message}",
+            "⚡ **FLAG SUBMITTED!** ⚡\n\n**{user}** from **{team}** sent a flag for **{challenge}**!\n\n{result_message}",
+            "💎 **FLAG ATTEMPT!** 💎\n\n**{user}** from **{team}** attempted **{challenge}**!\n\n{result_message}",
+            "🔥 **FLAG SUBMISSION!** 🔥\n\n**{user}** from **{team}** submitted to **{challenge}**!\n\n{result_message}",
+            "🌟 **FLAG ATTEMPT!** 🌟\n\n**{user}** from **{team}** tried **{challenge}**!\n\n{result_message}",
+            "✨ **FLAG SUBMITTED!** ✨\n\n**{user}** from **{team}** sent flag for **{challenge}**!\n\n{result_message}",
+            "🎊 **FLAG ATTEMPT!** 🎊\n\n**{user}** from **{team}** attempted **{challenge}**!\n\n{result_message}",
+            "🏆 **FLAG SUBMISSION!** 🏆\n\n**{user}** from **{team}** submitted **{challenge}**!\n\n{result_message}",
+            "🚀 **FLAG ATTEMPT!** 🚀\n\n**{user}** from **{team}** tried **{challenge}**!\n\n{result_message}"
+        ]
+        
+        self.container_start_messages = [
+            "🚀 **CONTAINER STARTED!** 🚀\n\nContainer for **{challenge}** has been launched!\n\n⚡ *The challenge is now live!* ⚡",
+            "🌟 **CONTAINER LAUNCHED!** 🌟\n\n**{challenge}** container is now running!\n\n💫 *Ready for action!* 💫",
+            "🔥 **CONTAINER ACTIVATED!** 🔥\n\n**{challenge}** container has started!\n\n🎯 *Time to engage!* 🎯",
+            "✨ **CONTAINER ONLINE!** ✨\n\n**{challenge}** container is now available!\n\n🎪 *The show begins!* 🎪",
+            "💎 **CONTAINER DEPLOYED!** 💎\n\n**{challenge}** container is live!\n\n🏅 *Glory awaits!* 🏅",
+            "🎊 **CONTAINER RUNNING!** 🎊\n\n**{challenge}** container has started!\n\n🎭 *The adventure unfolds!* 🎭",
+            "⚡ **CONTAINER LAUNCHED!** ⚡\n\n**{challenge}** container is now active!\n\n🚀 *Ready for takeoff!* 🚀",
+            "🏆 **CONTAINER STARTED!** 🏆\n\n**{challenge}** container is running!\n\n👑 *The throne is ready!* 👑",
+            "🎯 **CONTAINER DEPLOYED!** 🎯\n\n**{challenge}** container is live!\n\n💪 *Strength meets opportunity!* 💪",
+            "🚀 **CONTAINER ONLINE!** 🚀\n\n**{challenge}** container has launched!\n\n🌟 *The stars align!* 🌟"
+        ]
+        
+        self.container_destroy_messages = [
+            "💥 **CONTAINER DESTROYED!** 💥\n\nContainer for **{challenge}** has been terminated!\n\n🔄 *Time for a fresh start!* 🔄",
+            "🔥 **CONTAINER TERMINATED!** 🔥\n\n**{challenge}** container has been destroyed!\n\n⚡ *Clean slate achieved!* ⚡",
+            "🌟 **CONTAINER SHUTDOWN!** 🌟\n\n**{challenge}** container has been stopped!\n\n💫 *Rest and reset!* 💫",
+            "✨ **CONTAINER CLEANED!** ✨\n\n**{challenge}** container has been destroyed!\n\n🎪 *Fresh canvas awaits!* 🎪",
+            "💎 **CONTAINER REMOVED!** 💎\n\n**{challenge}** container has been terminated!\n\n🏅 *Clean environment restored!* 🏅",
+            "🎊 **CONTAINER DESTROYED!** 🎊\n\n**{challenge}** container has been stopped!\n\n🎭 *The cycle continues!* 🎭",
+            "⚡ **CONTAINER TERMINATED!** ⚡\n\n**{challenge}** container has been destroyed!\n\n🚀 *Ready for rebirth!* 🚀",
+            "🏆 **CONTAINER CLEANED!** 🏆\n\n**{challenge}** container has been removed!\n\n👑 *Fresh start awaits!* 👑",
+            "🎯 **CONTAINER SHUTDOWN!** 🎯\n\n**{challenge}** container has been destroyed!\n\n💪 *Strength in renewal!* 💪",
+            "🚀 **CONTAINER REMOVED!** 🚀\n\n**{challenge}** container has been terminated!\n\n🌟 *New beginnings!* 🌟"
+        ]
+        
+        self.cheat_detected_messages = [
+            "⚠️ **CHEAT DETECTED!** ⚠️\n\n**{user}** from **{team}** has been flagged for suspicious activity!\n\n🚨 *Fair play is essential!* 🚨",
+            "🚨 **SUSPICIOUS ACTIVITY!** 🚨\n\n**{user}** from **{team}** has triggered cheat detection!\n\n⚡ *Integrity matters!* ⚡",
+            "🔥 **CHEAT ALERT!** 🔥\n\n**{user}** from **{team}** has been detected!\n\n💎 *Honor above all!* 💎",
+            "🌟 **FAIR PLAY VIOLATION!** 🌟\n\n**{user}** from **{team}** has been flagged!\n\n🎯 *Skill over shortcuts!* 🎯",
+            "✨ **INTEGRITY ALERT!** ✨\n\n**{user}** from **{team}** has been detected!\n\n🎪 *Respect the game!* 🎪",
+            "💎 **CHEAT DETECTED!** 💎\n\n**{user}** from **{team}** has been flagged!\n\n🏅 *Honor the competition!* 🏅",
+            "🎊 **SUSPICIOUS BEHAVIOR!** 🎊\n\n**{user}** from **{team}** has been detected!\n\n🎭 *Play with honor!* 🎭",
+            "⚡ **FAIR PLAY VIOLATION!** ⚡\n\n**{user}** from **{team}** has been flagged!\n\n🚀 *Integrity first!* 🚀",
+            "🏆 **CHEAT ALERT!** 🏆\n\n**{user}** from **{team}** has been detected!\n\n👑 *Respect the crown!* 👑",
+            "🎯 **INTEGRITY VIOLATION!** 🎯\n\n**{user}** from **{team}** has been flagged!\n\n💪 *Strength in honesty!* 💪"
+        ]
     
     def format_notice(self, notice: Dict[str, Any]) -> Optional[discord.Embed]:
         """Format a game notice into a Discord embed"""
@@ -193,16 +273,16 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 hint = values[1]
-                return f"New hint for **{challenge}**: {hint}"
+                return random.choice(self.new_hint_messages).format(challenge=challenge) + f"\n\n💡 **Hint**: {hint}"
             else:
-                return " ".join(values)
+                return random.choice(self.new_hint_messages).format(challenge=values[0] if values else "Unknown Challenge")
         
         elif notice_type == "NewChallenge":
             if values:
                 challenge = values[0]
-                return f"New challenge **{challenge}** is now available!"
+                return random.choice(self.new_challenge_messages).format(challenge=challenge)
             else:
-                return " ".join(values)
+                return random.choice(self.new_challenge_messages).format(challenge="Unknown Challenge")
         
         else:
             return " ".join(values)
@@ -216,28 +296,47 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 result = values[1]
+                user = event.get('user', 'Unknown')
+                team = event.get('team', 'Unknown')
+                
                 if result == "Accepted":
-                    return f"✅ Flag submitted for **{challenge}** - **ACCEPTED!**"
+                    result_message = "✅ **ACCEPTED!** - *Excellent work!* ✅"
                 elif result == "WrongAnswer":
-                    return f"❌ Flag submitted for **{challenge}** - **WRONG ANSWER**"
+                    result_message = "❌ **WRONG ANSWER** - *Keep trying!* ❌"
                 else:
-                    return f"Flag submitted for **{challenge}** - {result}"
+                    result_message = f"📝 **{result}** - *Interesting attempt!* 📝"
+                
+                return random.choice(self.flag_submit_messages).format(
+                    user=user, team=team, challenge=challenge, result_message=result_message
+                )
             else:
                 return " ".join(values)
         
-        elif event_type in ["ContainerStart", "ContainerDestroy"]:
+        elif event_type == "ContainerStart":
             if values:
                 challenge = values[0]
-                action = "started" if event_type == "ContainerStart" else "destroyed"
-                return f"Container for **{challenge}** has been {action}."
+                return random.choice(self.container_start_messages).format(challenge=challenge)
             else:
-                return " ".join(values)
+                return random.choice(self.container_start_messages).format(challenge="Unknown Challenge")
+        
+        elif event_type == "ContainerDestroy":
+            if values:
+                challenge = values[0]
+                return random.choice(self.container_destroy_messages).format(challenge=challenge)
+            else:
+                return random.choice(self.container_destroy_messages).format(challenge="Unknown Challenge")
         
         elif event_type == "CheatDetected":
+            user = event.get('user', 'Unknown')
+            team = event.get('team', 'Unknown')
             if values:
-                return f"🚨 **CHEAT DETECTED**: {' '.join(values)}"
+                return random.choice(self.cheat_detected_messages).format(
+                    user=user, team=team
+                ) + f"\n\n🚨 **Details**: {' '.join(values)}"
             else:
-                return "🚨 **CHEAT DETECTED**"
+                return random.choice(self.cheat_detected_messages).format(
+                    user=user, team=team
+                )
         
         else:
             return " ".join(values)
