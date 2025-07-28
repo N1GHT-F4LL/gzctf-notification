@@ -2,6 +2,7 @@ import discord
 from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,46 @@ class NotificationFormatter:
             "NewChallenge": 0x00FF00,  # Green
             "Normal": 0x808080         # Gray
         }
+        
+        # Random congratulation messages for different blood types
+        self.first_blood_messages = [
+            "🎉 **CONGRATULATIONS!** 🎉\n\n**{team}** has achieved the **FIRST BLOOD** on **{challenge}**!\n\n🌟 *Making history with the first solve!* 🌟",
+            "🏆 **LEGENDARY!** 🏆\n\n**{team}** has claimed the **FIRST BLOOD** on **{challenge}**!\n\n🔥 *The first to conquer this challenge!* 🔥",
+            "⚡ **INCREDIBLE!** ⚡\n\n**{team}** has secured the **FIRST BLOOD** on **{challenge}**!\n\n💎 *Setting the standard for others to follow!* 💎",
+            "🚀 **PHENOMENAL!** 🚀\n\n**{team}** has achieved the **FIRST BLOOD** on **{challenge}**!\n\n👑 *The crown belongs to the first!* 👑",
+            "💫 **SPECTACULAR!** 💫\n\n**{team}** has earned the **FIRST BLOOD** on **{challenge}**!\n\n⭐ *Leading the pack with brilliance!* ⭐",
+            "🎊 **EXTRAORDINARY!** 🎊\n\n**{team}** has conquered the **FIRST BLOOD** on **{challenge}**!\n\n🏅 *The pioneer of this challenge!* 🏅",
+            "🌟 **MAGNIFICENT!** 🌟\n\n**{team}** has seized the **FIRST BLOOD** on **{challenge}**!\n\n💫 *A masterclass in problem-solving!* 💫",
+            "🔥 **SENSATIONAL!** 🔥\n\n**{team}** has captured the **FIRST BLOOD** on **{challenge}**!\n\n⚔️ *The first warrior to victory!* ⚔️",
+            "💎 **REMARKABLE!** 💎\n\n**{team}** has dominated the **FIRST BLOOD** on **{challenge}**!\n\n🎯 *Precision and speed combined!* 🎯",
+            "✨ **FABULOUS!** ✨\n\n**{team}** has mastered the **FIRST BLOOD** on **{challenge}**!\n\n🎪 *The showstopper of the competition!* 🎪"
+        ]
+        
+        self.second_blood_messages = [
+            "🎊 **AMAZING!** 🎊\n\n**{team}** has secured the **SECOND BLOOD** on **{challenge}**!\n\n⚡ *Quick thinking and great skills!* ⚡",
+            "🥈 **OUTSTANDING!** 🥈\n\n**{team}** has claimed the **SECOND BLOOD** on **{challenge}**!\n\n💪 *Proving that speed isn't everything!* 💪",
+            "🌟 **FANTASTIC!** 🌟\n\n**{team}** has achieved the **SECOND BLOOD** on **{challenge}**!\n\n🎯 *Precision and determination pay off!* 🎯",
+            "🔥 **EXCELLENT!** 🔥\n\n**{team}** has earned the **SECOND BLOOD** on **{challenge}**!\n\n⚔️ *A worthy challenger emerges!* ⚔️",
+            "💎 **BRILLIANT!** 💎\n\n**{team}** has secured the **SECOND BLOOD** on **{challenge}**!\n\n🎪 *The show must go on!* 🎪",
+            "🎯 **IMPRESSIVE!** 🎯\n\n**{team}** has captured the **SECOND BLOOD** on **{challenge}**!\n\n🚀 *Rocketing to the top!* 🚀",
+            "✨ **STUNNING!** ✨\n\n**{team}** has conquered the **SECOND BLOOD** on **{challenge}**!\n\n💫 *A dazzling display of skill!* 💫",
+            "🏅 **EXCEPTIONAL!** 🏅\n\n**{team}** has mastered the **SECOND BLOOD** on **{challenge}**!\n\n🎨 *Artistry in problem-solving!* 🎨",
+            "⚡ **DYNAMIC!** ⚡\n\n**{team}** has dominated the **SECOND BLOOD** on **{challenge}**!\n\n🔥 *Burning with determination!* 🔥",
+            "💎 **SPARKLING!** 💎\n\n**{team}** has seized the **SECOND BLOOD** on **{challenge}**!\n\n🌟 *Shining bright in the competition!* 🌟"
+        ]
+        
+        self.third_blood_messages = [
+            "🎯 **EXCELLENT!** 🎯\n\n**{team}** has claimed the **THIRD BLOOD** on **{challenge}**!\n\n💪 *Persistence pays off!* 💪",
+            "🥉 **GREAT JOB!** 🥉\n\n**{team}** has achieved the **THIRD BLOOD** on **{challenge}**!\n\n🎨 *Creativity and skill combined!* 🎨",
+            "✨ **WONDERFUL!** ✨\n\n**{team}** has earned the **THIRD BLOOD** on **{challenge}**!\n\n🎭 *The third time's the charm!* 🎭",
+            "🎪 **SPLENDID!** 🎪\n\n**{team}** has secured the **THIRD BLOOD** on **{challenge}**!\n\n🎲 *Luck favors the prepared!* 🎲",
+            "🏅 **SUPERB!** 🏅\n\n**{team}** has claimed the **THIRD BLOOD** on **{challenge}**!\n\n🎪 *The competition is heating up!* 🎪",
+            "🌟 **MARVELOUS!** 🌟\n\n**{team}** has captured the **THIRD BLOOD** on **{challenge}**!\n\n💎 *A gem of a performance!* 💎",
+            "🔥 **TREMENDOUS!** 🔥\n\n**{team}** has conquered the **THIRD BLOOD** on **{challenge}**!\n\n⚡ *Electrifying problem-solving!* ⚡",
+            "🎊 **FANTASTIC!** 🎊\n\n**{team}** has mastered the **THIRD BLOOD** on **{challenge}**!\n\n🚀 *Soaring to new heights!* 🚀",
+            "💫 **BRILLIANT!** 💫\n\n**{team}** has dominated the **THIRD BLOOD** on **{challenge}**!\n\n👑 *Royal problem-solving skills!* 👑",
+            "🎯 **OUTSTANDING!** 🎯\n\n**{team}** has seized the **THIRD BLOOD** on **{challenge}**!\n\n🏆 *A champion's performance!* 🏆"
+        ]
         
         self.event_colors = {
             "FlagSubmit": 0x00FF00,    # Green
@@ -110,12 +151,12 @@ class NotificationFormatter:
     def _format_notice_title(self, notice_type: str) -> str:
         """Format notice type into a readable title"""
         titles = {
-            "FirstBlood": "First Blood! 🩸",
-            "SecondBlood": "Second Blood! 🩸",
-            "ThirdBlood": "Third Blood! 🩸",
-            "NewHint": "New Hint Available",
-            "NewChallenge": "New Challenge Released",
-            "Normal": "Game Notice"
+            "FirstBlood": "🏆 FIRST BLOOD! 🏆",
+            "SecondBlood": "🥈 SECOND BLOOD! 🥈",
+            "ThirdBlood": "🥉 THIRD BLOOD! 🥉",
+            "NewHint": "💡 New Hint Available",
+            "NewChallenge": "🎯 New Challenge Released",
+            "Normal": "📢 Game Notice"
         }
         return titles.get(notice_type, "Game Notice")
     
@@ -139,7 +180,12 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 team = values[1]
-                return f"**{challenge}** has been solved by **{team}**!"
+                if notice_type == "FirstBlood":
+                    return random.choice(self.first_blood_messages).format(team=team, challenge=challenge)
+                elif notice_type == "SecondBlood":
+                    return random.choice(self.second_blood_messages).format(team=team, challenge=challenge)
+                else:  # ThirdBlood
+                    return random.choice(self.third_blood_messages).format(team=team, challenge=challenge)
             else:
                 return " ".join(values)
         

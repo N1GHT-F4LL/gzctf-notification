@@ -57,7 +57,7 @@ def load_config() -> BotConfig:
     discord_config = DiscordConfig(
         token=os.getenv("DISCORD_TOKEN", ""),
         channel_id=int(os.getenv("DISCORD_CHANNEL_ID", "0")),
-        guild_id=int(os.getenv("DISCORD_GUILD_ID", "0")) if os.getenv("DISCORD_GUILD_ID") else None
+        guild_id=int(os.getenv("DISCORD_GUILD_ID")) if os.getenv("DISCORD_GUILD_ID") else None
     )
     
     # Bot Configuration
