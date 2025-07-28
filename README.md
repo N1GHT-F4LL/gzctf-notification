@@ -17,7 +17,6 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
   - ⚠️ Cheat detection alerts
 - **Duplicate Prevention**: Tracks seen notifications to avoid spam
 - **Persistent State**: Remembers last notification ID across restarts
-- **Bot Commands**: Built-in commands for status checking and manual refresh
 - **Configurable**: Easy configuration via environment variables
 
 ## Supported Notification Types
@@ -150,26 +149,7 @@ The bot will:
 3. Start polling for notifications every 30 seconds (configurable)
 4. Send formatted notifications to the specified Discord channel
 
-### Bot Commands
 
-The bot uses modern slash commands for the best user experience:
-
-#### Command Permissions
-
-To use bot commands, users need the following permissions in the channel:
-- **Send Messages** - Required to send command responses
-- **Use Slash Commands** - Required to use slash commands
-- **Embed Links** - Required for rich message formatting
-
-If a user lacks these permissions, they will receive an error message when trying to use commands.
-
-#### Available Commands
-
-- `/status` - Show bot status and monitoring information
-- `/refresh` - Manually refresh notifications
-- `/games` - List available games on the GZCTF platform
-- `/reset` - Reset bot state (start monitoring from beginning)
-- `/permissions` - Check your permissions for bot commands
 
 ### Debugging
 
@@ -188,6 +168,7 @@ If you encounter issues, you can:
    ```bash
    python check_discord_permissions.py
    ```
+
 
 ## Example Notifications
 

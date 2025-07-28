@@ -199,6 +199,14 @@ class NotificationFormatter:
     def _timestamp_to_datetime(self, timestamp: int) -> datetime:
         """Convert Unix timestamp to datetime"""
         try:
-            return datetime.fromtimestamp(timestamp)
-        except (ValueError, TypeError):
-            return datetime.utcnow() 
+            # Handle different timestamp formats
+            if isinstance(timestamp, (int, float)):
+                # Check if timestamp is in seconds or milliseconds
+                if timestamp > 1e10:  # Likely milliseconds
+                    timestamp = timestamp / 1000
+                return datetime.fromtimestamp(timestamp)
+            else:
+                return datetime.now()
+        except (ValueError, TypeError, OSError):
+            # Return current time if timestamp is invalid
+            return datetime.now() 
