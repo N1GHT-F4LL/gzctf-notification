@@ -23,7 +23,7 @@ USER bot
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import asyncio; from test_config import test_gzctf_connection; asyncio.run(test_gzctf_connection())" || exit 1
+    CMD python -c "import asyncio; from scripts.test_config import test_gzctf_connection; asyncio.run(test_gzctf_connection())" || exit 1
 
 # Run the bot
-CMD ["python", "main.py"] 
+CMD ["python", "bot/main.py"] 
