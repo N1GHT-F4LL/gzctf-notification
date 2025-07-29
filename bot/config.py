@@ -6,9 +6,8 @@ from dataclasses import dataclass
 class GZCTFConfig:
     """GZCTF API Configuration"""
     base_url: str
-    api_token: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
+    username: str
+    password: str
 
 @dataclass
 class DiscordConfig:
@@ -47,9 +46,8 @@ def load_config() -> BotConfig:
     # GZCTF Configuration
     gzctf_config = GZCTFConfig(
         base_url=os.getenv("GZCTF_BASE_URL", "http://localhost:8080"),
-        api_token=os.getenv("GZCTF_API_TOKEN"),
-        username=os.getenv("GZCTF_USERNAME"),
-        password=os.getenv("GZCTF_PASSWORD")
+        username=os.getenv("GZCTF_USERNAME", ""),
+        password=os.getenv("GZCTF_PASSWORD", "")
     )
     
     # Discord Configuration

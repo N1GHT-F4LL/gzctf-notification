@@ -53,13 +53,12 @@ async def main():
         logger.info(f"Events Enabled: {config.enable_events}")
         logger.info(f"Debug Mode: {config.debug}")
         
-        # Log authentication method
-        if config.gzctf.api_token:
-            logger.info("Using API token authentication")
-        elif config.gzctf.username and config.gzctf.password:
-            logger.info("Using username/password authentication")
-        else:
-            logger.warning("No authentication method configured")
+        # Validate authentication credentials
+        if not (config.gzctf.username and config.gzctf.password):
+            logger.error("Username and password are required. Set GZCTF_USERNAME and GZCTF_PASSWORD environment variables.")
+            sys.exit(1)
+        
+        logger.info(f"Using username/password authentication for user: {config.gzctf.username}")
         
         # Create GZCTF client
         async with GZCTFClient(config.gzctf) as gzctf_client:

@@ -86,8 +86,6 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
    ```env
    # GZCTF Configuration
    GZCTF_BASE_URL=http://your-gzctf-instance.com
-   GZCTF_API_TOKEN=your_api_token_here
-   # OR use username/password authentication
    GZCTF_USERNAME=your_username
    GZCTF_PASSWORD=your_password
 
@@ -113,9 +111,8 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `GZCTF_BASE_URL` | GZCTF platform URL | Yes | - |
-| `GZCTF_API_TOKEN` | API token for authentication | No* | - |
-| `GZCTF_USERNAME` | Username for authentication | No* | - |
-| `GZCTF_PASSWORD` | Password for authentication | No* | - |
+| `GZCTF_USERNAME` | Username for authentication | Yes | - |
+| `GZCTF_PASSWORD` | Password for authentication | Yes | - |
 | `DISCORD_TOKEN` | Discord bot token | Yes | - |
 | `DISCORD_CHANNEL_ID` | Discord channel ID for notifications | Yes* | - |
 | `DISCORD_GUILD_ID` | Discord guild ID (server) | Yes | - |

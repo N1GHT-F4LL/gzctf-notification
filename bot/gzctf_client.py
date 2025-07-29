@@ -3,6 +3,7 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import logging
+import json
 
 from config import GZCTFConfig
 
@@ -25,13 +26,9 @@ class GZCTFClient:
             await self.session.close()
     
     async def authenticate(self) -> bool:
-        """Authenticate with GZCTF API"""
-        if self.config.api_token:
-            self.auth_token = self.config.api_token
-            return True
-            
+        """Authenticate with GZCTF API using username/password"""
         if not (self.config.username and self.config.password):
-            logger.warning("No authentication credentials provided")
+            logger.error("Username and password are required for authentication")
             return False
             
         try:
@@ -61,6 +58,7 @@ class GZCTFClient:
                     return True
                 else:
                     logger.error(f"Authentication failed: {response.status}")
+                    logger.debug(f"Response content: {await response.text()}")
                     return False
                     
         except Exception as e:
@@ -78,6 +76,21 @@ class GZCTFClient:
             headers["Authorization"] = f"Bearer {self.auth_token}"
             
         return headers
+    
+    async def is_authenticated(self) -> bool:
+        """Check if we are currently authenticated"""
+        if not self.auth_token:
+            return False
+            
+        try:
+            base_url = self.config.base_url.rstrip('/')
+            async with self.session.get(
+                f"{base_url}/api/games",
+                headers=self._get_headers()
+            ) as response:
+                return response.status != 401
+        except Exception:
+            return False
     
     async def get_game_notices(self, game_id: int, count: int = 100, skip: int = 0) -> List[Dict[str, Any]]:
         """Get game notices from GZCTF API"""
@@ -103,6 +116,27 @@ class GZCTFClient:
                         logger.error(f"Failed to parse JSON response: {json_error}")
                         logger.debug(f"Response content: {await response.text()}")
                         return []
+                elif response.status == 401:
+                    # Try to re-authenticate on 401 error
+                    logger.warning("Received 401 error for notices, attempting to re-authenticate...")
+                    if await self.authenticate():
+                        logger.info("Re-authentication successful, retrying notices request...")
+                        # Retry the request with new authentication
+                        async with self.session.get(url, params=params, headers=self._get_headers()) as retry_response:
+                            if retry_response.status == 200:
+                                try:
+                                    data = await retry_response.json()
+                                    return data
+                                except Exception as json_error:
+                                    logger.error(f"Failed to parse JSON response after retry: {json_error}")
+                                    return []
+                            else:
+                                logger.error(f"Failed to get game notices after re-auth: {retry_response.status}")
+                                logger.debug(f"Response content: {await retry_response.text()}")
+                                return []
+                    else:
+                        logger.error("Re-authentication failed for notices")
+                        return []
                 else:
                     logger.error(f"Failed to get game notices: {response.status}")
                     logger.debug(f"Response content: {await response.text()}")
@@ -115,7 +149,6 @@ class GZCTFClient:
     async def get_game_events(self, game_id: int, count: int = 100, skip: int = 0, hide_container: bool = False) -> List[Dict[str, Any]]:
         """Get game events from GZCTF API"""
         try:
-            # Ensure base_url doesn't end with slash to avoid double slashes
             base_url = self.config.base_url.rstrip('/')
             url = f"{base_url}/api/game/{game_id}/events"
             params = {
@@ -123,28 +156,90 @@ class GZCTFClient:
                 "skip": skip,
                 "hideContainer": str(hide_container).lower()  # Convert boolean to string
             }
-            
+            headers = self._get_headers()
+            # Log chi tiết nếu debug
+            if hasattr(self.config, 'debug') and self.config.debug:
+                logger.debug(f"[DEBUG] Requesting events: {url} params={params} headers={headers}")
             async with self.session.get(
                 url, 
                 params=params, 
-                headers=self._get_headers()
+                headers=headers
             ) as response:
-                logger.debug(f"Game events response status: {response.status}")
-                logger.debug(f"Game events response headers: {response.headers}")
-                
-                if response.status == 200:
-                    try:
-                        data = await response.json()
-                        return data
-                    except Exception as json_error:
-                        logger.error(f"Failed to parse JSON response: {json_error}")
-                        logger.debug(f"Response content: {await response.text()}")
+                if hasattr(self.config, 'debug') and self.config.debug:
+                    logger.debug(f"[DEBUG] Game events response status: {response.status}")
+                    logger.debug(f"[DEBUG] Game events response headers: {dict(response.headers)}")
+                    text = await response.text()
+                    logger.debug(f"[DEBUG] Game events response text: {text[:500]}")
+                    # parse lại JSON nếu status 200
+                    if response.status == 200:
+                        try:
+                            data = json.loads(text)
+                            return data
+                        except Exception as json_error:
+                            logger.error(f"Failed to parse JSON response: {json_error}")
+                            logger.debug(f"Response content: {text}")
+                            return []
+                    elif response.status == 401:
+                        # Try to re-authenticate on 401 error
+                        logger.warning("Received 401 error, attempting to re-authenticate...")
+                        if await self.authenticate():
+                            logger.info("Re-authentication successful, retrying request...")
+                            # Retry the request with new authentication
+                            headers = self._get_headers()
+                            async with self.session.get(url, params=params, headers=headers) as retry_response:
+                                if retry_response.status == 200:
+                                    try:
+                                        data = await retry_response.json()
+                                        return data
+                                    except Exception as json_error:
+                                        logger.error(f"Failed to parse JSON response after retry: {json_error}")
+                                        return []
+                                else:
+                                    logger.error(f"Failed to get game events after re-auth: {retry_response.status}")
+                                    logger.debug(f"Response content: {await retry_response.text()}")
+                                    return []
+                        else:
+                            logger.error("Re-authentication failed")
+                            return []
+                    else:
+                        logger.error(f"Failed to get game events: {response.status}")
+                        logger.debug(f"Response content: {text}")
                         return []
                 else:
-                    logger.error(f"Failed to get game events: {response.status}")
-                    logger.debug(f"Response content: {await response.text()}")
-                    return []
-                    
+                    if response.status == 200:
+                        try:
+                            data = await response.json()
+                            return data
+                        except Exception as json_error:
+                            logger.error(f"Failed to parse JSON response: {json_error}")
+                            logger.debug(f"Response content: {await response.text()}")
+                            return []
+                    elif response.status == 401:
+                        # Try to re-authenticate on 401 error
+                        logger.warning("Received 401 error, attempting to re-authenticate...")
+                        if await self.authenticate():
+                            logger.info("Re-authentication successful, retrying request...")
+                            # Retry the request with new authentication
+                            headers = self._get_headers()
+                            async with self.session.get(url, params=params, headers=headers) as retry_response:
+                                if retry_response.status == 200:
+                                    try:
+                                        data = await retry_response.json()
+                                        return data
+                                    except Exception as json_error:
+                                        logger.error(f"Failed to parse JSON response after retry: {json_error}")
+                                        return []
+                                else:
+                                    logger.error(f"Failed to get game events after re-auth: {retry_response.status}")
+                                    logger.debug(f"Response content: {await retry_response.text()}")
+                                    return []
+                        else:
+                            logger.error("Re-authentication failed")
+                            return []
+                    else:
+                        logger.error(f"Failed to get game events: {response.status}")
+                        logger.debug(f"Response content: {await response.text()}")
+                        return []
         except Exception as e:
             logger.error(f"Error fetching game events: {e}")
             return []
