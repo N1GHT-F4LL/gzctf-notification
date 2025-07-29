@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class NotificationFormatter:
     """Format GZCTF notifications into Discord embeds"""
     
-    def __init__(self):
+    def __init__(self, config=None):
         # Color mapping for different notification types
         self.notice_colors = {
             "FirstBlood": 0xFF0000,    # Red

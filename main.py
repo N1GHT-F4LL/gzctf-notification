@@ -69,12 +69,8 @@ async def main():
             
             # Create and run Discord bot
             bot = GZCTFNotificationBot(
-                discord_config=config.discord,
-                gzctf_client=gzctf_client,
-                game_id=config.game_id,
-                poll_interval=config.poll_interval,
-                enable_notices=config.enable_notices,
-                enable_events=config.enable_events
+                config=config,
+                gzctf_client=gzctf_client
             )
             
             # Run the bot

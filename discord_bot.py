@@ -8,7 +8,7 @@ from datetime import datetime
 import json
 import os
 
-from config import DiscordConfig
+from config import DiscordConfig, BotConfig
 from gzctf_client import GZCTFClient
 from notification_formatter import NotificationFormatter
 
@@ -17,9 +17,7 @@ logger = logging.getLogger(__name__)
 class GZCTFNotificationBot(commands.Bot):
     """Discord bot for GZCTF notifications"""
     
-    def __init__(self, discord_config: DiscordConfig, gzctf_client: GZCTFClient, 
-                 game_id: int, poll_interval: int = 30, enable_notices: bool = True, 
-                 enable_events: bool = True):
+    def __init__(self, config: BotConfig, gzctf_client: GZCTFClient):
         intents = discord.Intents.default()
         intents.message_content = True
         
@@ -28,23 +26,24 @@ class GZCTFNotificationBot(commands.Bot):
         # Add slash command support
         # Use the built-in command tree from discord.py
         
-        self.discord_config = discord_config
+        self.config = config
+        self.discord_config = config.discord
         self.gzctf_client = gzctf_client
-        self.game_id = game_id
-        self.poll_interval = poll_interval
-        self.enable_notices = enable_notices
-        self.enable_events = enable_events
+        self.game_id = config.game_id
+        self.poll_interval = config.poll_interval
+        self.enable_notices = config.enable_notices
+        self.enable_events = config.enable_events
         
         # State file for persistent storage
-        self.state_file = f"bot_state_game_{game_id}.json"
+        self.state_file = f"bot_state_game_{self.game_id}.json"
         
         # Load previous state or initialize
         self.last_notice_id = None
         self.last_event_time = None
         self.load_state()
         
-        # Notification formatter
-        self.formatter = NotificationFormatter()
+        # Notification formatter with config
+        self.formatter = NotificationFormatter(config)
         
         # Start polling task
         self.poll_notifications.start()

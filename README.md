@@ -71,7 +71,6 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
      - **Send Messages** (Required for sending notifications)
      - **Use Slash Commands** (Required for slash commands)
      - **Embed Links** (For rich message formatting)
-     - **Attach Files** (For potential file attachments)
      - **Use External Emojis** (For better message formatting)
    - Use the generated URL to invite the bot to your server
    - **Important**: Make sure the bot has access to the specific channel where you want notifications sent
@@ -149,8 +148,6 @@ The bot will:
 3. Start polling for notifications every 30 seconds (configurable)
 4. Send formatted notifications to the specified Discord channel
 
-
-
 ### Debugging
 
 If you encounter issues, you can:
@@ -168,7 +165,6 @@ If you encounter issues, you can:
    ```bash
    python check_discord_permissions.py
    ```
-
 
 ## Example Notifications
 
@@ -218,17 +214,17 @@ Team: Team Beta
    - Add the bot role and ensure it has "Send Messages" permission
    - Check if the channel has any permission overwrites that might block the bot
 
-2. **Discord Bot Not Responding**
+4. **Discord Bot Not Responding**
    - Check the bot token is correct
    - Ensure the bot has proper permissions in the channel
    - Verify the channel ID is correct
 
-3. **No Notifications Received**
+5. **No Notifications Received**
    - Check if the game ID is correct
    - Verify the game has active notifications
    - Check the bot logs for errors
 
-4. **Duplicate Notifications**
+6. **Duplicate Notifications**
    - The bot tracks seen notifications to prevent duplicates
    - If you restart the bot, it may send recent notifications again
 
