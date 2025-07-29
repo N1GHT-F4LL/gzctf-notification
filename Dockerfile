@@ -21,11 +21,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy only necessary code
 COPY bot/ ./bot/
 
-# Create directories for persistent data
-RUN mkdir -p /app/data /app/logs
+# Create non-root user first
+RUN useradd -m -u 1000 bot
 
-# Create non-root user
-RUN useradd -m -u 1000 bot && chown -R bot:bot /app
+# Create directories for persistent data and set ownership
+RUN mkdir -p /app/data /app/logs && chown -R bot:bot /app
+
 USER bot
 
 # Run the bot

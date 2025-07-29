@@ -408,7 +408,28 @@ class GZCTFNotificationBot(commands.Bot):
                 'game_title': self.game_title,
                 'timestamp': datetime.utcnow().isoformat()
             }
-            with open(self.state_file, 'w') as f:
+            
+            # Ensure directory exists and has proper permissions
+            os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+            
+            # Try to write to a temporary file first, then rename
+            temp_file = self.state_file + '.tmp'
+            with open(temp_file, 'w') as f:
                 json.dump(state, f, indent=2)
+            
+            # Atomic rename
+            os.rename(temp_file, self.state_file)
+            logger.debug(f"State saved successfully to {self.state_file}")
+            
+        except PermissionError as e:
+            logger.error(f"Permission denied saving state to {self.state_file}: {e}")
+            logger.info("Bot will continue running but state won't be persisted")
         except Exception as e:
-            logger.error(f"Error saving state: {e}") 
+            logger.error(f"Error saving state: {e}")
+            # Clean up temp file if it exists
+            temp_file = self.state_file + '.tmp'
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass 

@@ -93,7 +93,7 @@ class GZCTFClient:
             return False
     
     async def get_game_notices(self, game_id: int, count: int = 100, skip: int = 0) -> List[Dict[str, Any]]:
-        """Get game notices from GZCTF API"""
+        """Get game notices from GZCTF API, sorted by timestamp in descending order"""
         try:
             # Ensure base_url doesn't end with slash to avoid double slashes
             base_url = self.config.base_url.rstrip('/')
@@ -111,7 +111,19 @@ class GZCTFClient:
                 if response.status == 200:
                     try:
                         data = await response.json()
-                        return data
+                        # Sort data by timestamp in descending order, handle empty timestamps
+                        def safe_timestamp_parse(item):
+                            timestamp = item.get('timestamp', '')
+                            if not timestamp:
+                                return datetime.min
+                            try:
+                                return datetime.fromisoformat(timestamp)
+                            except ValueError:
+                                logger.warning(f"Invalid timestamp format: {timestamp}")
+                                return datetime.min
+                        
+                        sorted_data = sorted(data, key=safe_timestamp_parse, reverse=True)
+                        return sorted_data
                     except Exception as json_error:
                         logger.error(f"Failed to parse JSON response: {json_error}")
                         logger.debug(f"Response content: {await response.text()}")
@@ -126,7 +138,19 @@ class GZCTFClient:
                             if retry_response.status == 200:
                                 try:
                                     data = await retry_response.json()
-                                    return data
+                                    # Sort data by timestamp in descending order, handle empty timestamps
+                                    def safe_timestamp_parse(item):
+                                        timestamp = item.get('timestamp', '')
+                                        if not timestamp:
+                                            return datetime.min
+                                        try:
+                                            return datetime.fromisoformat(timestamp)
+                                        except ValueError:
+                                            logger.warning(f"Invalid timestamp format: {timestamp}")
+                                            return datetime.min
+                                    
+                                    sorted_data = sorted(data, key=safe_timestamp_parse, reverse=True)
+                                    return sorted_data
                                 except Exception as json_error:
                                     logger.error(f"Failed to parse JSON response after retry: {json_error}")
                                     return []
@@ -147,7 +171,7 @@ class GZCTFClient:
             return []
     
     async def get_game_events(self, game_id: int, count: int = 100, skip: int = 0, hide_container: bool = False) -> List[Dict[str, Any]]:
-        """Get game events from GZCTF API"""
+        """Get game events from GZCTF API, sorted by timestamp in descending order"""
         try:
             base_url = self.config.base_url.rstrip('/')
             url = f"{base_url}/api/game/{game_id}/events"
@@ -174,7 +198,19 @@ class GZCTFClient:
                     if response.status == 200:
                         try:
                             data = json.loads(text)
-                            return data
+                            # Sort data by timestamp in descending order, handle empty timestamps
+                            def safe_timestamp_parse(item):
+                                timestamp = item.get('timestamp', '')
+                                if not timestamp:
+                                    return datetime.min
+                                try:
+                                    return datetime.fromisoformat(timestamp)
+                                except ValueError:
+                                    logger.warning(f"Invalid timestamp format: {timestamp}")
+                                    return datetime.min
+                            
+                            sorted_data = sorted(data, key=safe_timestamp_parse, reverse=True)
+                            return sorted_data
                         except Exception as json_error:
                             logger.error(f"Failed to parse JSON response: {json_error}")
                             logger.debug(f"Response content: {text}")
@@ -190,7 +226,19 @@ class GZCTFClient:
                                 if retry_response.status == 200:
                                     try:
                                         data = await retry_response.json()
-                                        return data
+                                        # Sort data by timestamp in descending order
+                                        def safe_timestamp_parse(item):
+                                            timestamp = item.get('timestamp', '')
+                                            if not timestamp:
+                                                return datetime.min
+                                            try:
+                                                return datetime.fromisoformat(timestamp)
+                                            except ValueError:
+                                                logger.warning(f"Invalid timestamp format: {timestamp}")
+                                                return datetime.min
+                                        
+                                        sorted_data = sorted(data, key=safe_timestamp_parse, reverse=True)
+                                        return sorted_data
                                     except Exception as json_error:
                                         logger.error(f"Failed to parse JSON response after retry: {json_error}")
                                         return []
@@ -209,7 +257,19 @@ class GZCTFClient:
                     if response.status == 200:
                         try:
                             data = await response.json()
-                            return data
+                            # Sort data by timestamp in descending order
+                            def safe_timestamp_parse(item):
+                                timestamp = item.get('timestamp', '')
+                                if not timestamp:
+                                    return datetime.min
+                                try:
+                                    return datetime.fromisoformat(timestamp)
+                                except ValueError:
+                                    logger.warning(f"Invalid timestamp format: {timestamp}")
+                                    return datetime.min
+                            
+                            sorted_data = sorted(data, key=safe_timestamp_parse, reverse=True)
+                            return sorted_data
                         except Exception as json_error:
                             logger.error(f"Failed to parse JSON response: {json_error}")
                             logger.debug(f"Response content: {await response.text()}")
@@ -225,7 +285,19 @@ class GZCTFClient:
                                 if retry_response.status == 200:
                                     try:
                                         data = await retry_response.json()
-                                        return data
+                                        # Sort data by timestamp in descending order
+                                        def safe_timestamp_parse(item):
+                                            timestamp = item.get('timestamp', '')
+                                            if not timestamp:
+                                                return datetime.min
+                                            try:
+                                                return datetime.fromisoformat(timestamp)
+                                            except ValueError:
+                                                logger.warning(f"Invalid timestamp format: {timestamp}")
+                                                return datetime.min
+                                        
+                                        sorted_data = sorted(data, key=safe_timestamp_parse, reverse=True)
+                                        return sorted_data
                                     except Exception as json_error:
                                         logger.error(f"Failed to parse JSON response after retry: {json_error}")
                                         return []
@@ -316,4 +388,4 @@ class GZCTFClient:
                     
         except Exception as e:
             logger.error(f"Error fetching game info for ID {game_id}: {e}")
-            return None 
+            return None
