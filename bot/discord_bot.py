@@ -42,6 +42,11 @@ class GZCTFNotificationBot(commands.Bot):
         self.last_event_time = None
         self.events_failure_count = 0
         self.events_disabled_due_to_auth = False
+        
+        # Initialize channel IDs to prevent AttributeError
+        self.notification_channel_id = None
+        self.event_channel_id = None
+        
         self.load_state()
         
         # Notification formatter with config
@@ -51,40 +56,11 @@ class GZCTFNotificationBot(commands.Bot):
         self.poll_notifications.change_interval(seconds=self.poll_interval)
         self.poll_notifications.start()
         
-    @commands.command(name='reset_events')
-    async def reset_events(self, ctx):
-        """Reset events failure count and re-enable events"""
-        if ctx.author.guild_permissions.administrator:
-            self.events_failure_count = 0
-            self.events_disabled_due_to_auth = False
-            self.save_state()
-            await ctx.send("✅ Events failure count reset. Events re-enabled.")
-            logger.info("Events manually reset by administrator")
-        else:
-            await ctx.send("❌ Only administrators can use this command.")
+
     
-    @commands.command(name='bot_status')
-    async def bot_status(self, ctx):
-        """Show bot status"""
-        status_lines = [
-            f"🎮 **Game ID:** {self.game_id}",
-            f"📢 **Notices:** {'✅ Enabled' if self.enable_notices else '❌ Disabled'}",
-            f"📅 **Events:** {'✅ Enabled' if self.enable_events and not self.events_disabled_due_to_auth else '❌ Disabled'}",
-            f"🔄 **Poll Interval:** {self.poll_interval}s",
-            f"📊 **Last Notice ID:** {self.last_notice_id or 'None'}",
-            f"⏰ **Last Event Time:** {self.last_event_time or 'None'}",
-        ]
-        
-        if self.events_disabled_due_to_auth:
-            status_lines.append(f"⚠️ **Events disabled due to auth issues** (failures: {self.events_failure_count})")
-        
-        embed = discord.Embed(
-            title="🤖 Bot Status",
-            description="\n".join(status_lines),
-            color=0x00ff00 if not self.events_disabled_due_to_auth else 0xffaa00
-        )
-        
-        await ctx.send(embed=embed)
+
+    
+
         
     async def setup_hook(self):
         """Setup hook called when bot starts"""
@@ -112,20 +88,30 @@ class GZCTFNotificationBot(commands.Bot):
         # Tạo hoặc lấy kênh notification
         notification_channel = discord.utils.get(guild.text_channels, name=notification_channel_name)
         if not notification_channel:
-            notification_channel = await guild.create_text_channel(notification_channel_name)
-            logger.info(f"Created notification channel: {notification_channel.name}")
-        self.notification_channel_id = notification_channel.id
+            try:
+                notification_channel = await guild.create_text_channel(notification_channel_name)
+                logger.info(f"Created notification channel: {notification_channel.name}")
+            except discord.Forbidden:
+                logger.error(f"Missing permissions to create notification channel")
+        
+        if notification_channel:
+            self.notification_channel_id = notification_channel.id
 
         # Tạo hoặc lấy kênh event
         event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
         if not event_channel:
-            event_channel = await guild.create_text_channel(event_channel_name)
-            logger.info(f"Created event channel: {event_channel.name}")
-        self.event_channel_id = event_channel.id
+            try:
+                event_channel = await guild.create_text_channel(event_channel_name)
+                logger.info(f"Created event channel: {event_channel.name}")
+            except discord.Forbidden:
+                logger.info(f"Missing permissions to create event channel - events will be disabled")
+        
+        if event_channel:
+            self.event_channel_id = event_channel.id
 
         # Set bot status
         status_text = f"GZCTF Game {self.game_id}"
-        if not self.enable_events or self.events_disabled_due_to_auth:
+        if not self.enable_events or not self.event_channel_id or self.events_disabled_due_to_auth:
             status_text += " (Notices Only)"
         await self.change_presence(
             activity=discord.Activity(
@@ -152,8 +138,8 @@ class GZCTFNotificationBot(commands.Bot):
                 if notices:
                     await self.process_notices(notices)
             
-            # Get new events if enabled and not disabled due to auth issues
-            if self.enable_events and not self.events_disabled_due_to_auth:
+            # Get new events if enabled and event channel exists
+            if self.enable_events and self.event_channel_id and not self.events_disabled_due_to_auth:
                 logger.debug(f"Fetching events for game {self.game_id}...")
                 events = await self.gzctf_client.get_game_events(self.game_id, count=10)
                 logger.debug(f"Events result: {len(events) if events else 'None/Error'}")
@@ -176,10 +162,9 @@ class GZCTFNotificationBot(commands.Bot):
                         logger.warning("Events endpoint has failed 5 times, disabling events due to authentication issues")
                         self.events_disabled_due_to_auth = True
                         self.save_state()
-            elif self.enable_events and self.events_disabled_due_to_auth:
-                logger.debug("Events disabled due to authentication issues, skipping events polling")
             else:
-                logger.debug("Events disabled in configuration")
+                # Skip events silently - no error logging needed
+                pass
                 
         except Exception as e:
             logger.error(f"Error polling notifications: {e}")
@@ -222,6 +207,10 @@ class GZCTFNotificationBot(commands.Bot):
         """Process and send new events to Discord"""
         if not events:
             logger.debug("No events to process")
+            return
+            
+        # Skip if no event channel (this should not happen as we check before calling this method)
+        if not self.event_channel_id:
             return
             
         logger.debug(f"Processing {len(events)} events, last_event_time: {self.last_event_time}")
@@ -267,18 +256,25 @@ class GZCTFNotificationBot(commands.Bot):
         """Send notification embed to correct Discord channel with detailed logging"""
         try:
             if notification_type == 'notice':
+                if not self.notification_channel_id:
+                    logger.error("Notification channel ID not set. Channel may not have been created.")
+                    return
                 channel = self.get_channel(self.notification_channel_id)
+                channel_type_desc = "notification"
             elif notification_type == 'event':
+                # Event channel check is now done in process_events before calling this method
                 channel = self.get_channel(self.event_channel_id)
+                channel_type_desc = "event"
             else:
                 logger.error(f"Unknown notification type '{notification_type}', cannot send message.")
                 return
+                
             if channel:
                 await channel.send(embed=embed)
                 
                 # Create detailed log message
                 log_parts = []
-                log_parts.append(f"Sent {notification_type}: {embed.title}")
+                log_parts.append(f"Sent {notification_type} to {channel_type_desc} channel: {embed.title}")
                 
                 # Add content type
                 log_parts.append(f"Type: {content_type}")

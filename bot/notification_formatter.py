@@ -127,14 +127,15 @@ class NotificationFormatter:
     
     def _format_event_title(self, event_type: str, values: list = None) -> str:
         """Format event type into a readable title with dynamic content"""
-        if event_type == "FlagSubmit" and values and len(values) >= 1:
+        if event_type == "FlagSubmit" and values and len(values) >= 3:
             result = values[0]
+            challenge = values[2]
             if result == "Accepted":
-                return "🎉 Flag Accepted!"
+                return f"🎉 {challenge} - Flag Accepted!"
             elif result == "WrongAnswer":
-                return "❌ Wrong Flag"
+                return f"❌ {challenge} - Wrong Flag"
             else:
-                return f"🚩 Flag {result}"
+                return f"🚩 {challenge} - Flag {result}"
         
         titles = {
             "FlagSubmit": "🚩 Flag Submission",
@@ -222,7 +223,7 @@ class NotificationFormatter:
                 # Truncate long flags for display
                 display_flag = flag if len(flag) <= 50 else f"{flag[:47]}..."
                 
-                return f"**{challenge}** flag submission\n{result_emoji} {result_text}\n`{display_flag}`"
+                return f"Submitted flag: `{display_flag}`"
             else:
                 return f"Flag submission: {' '.join(values)}"
         

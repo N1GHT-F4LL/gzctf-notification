@@ -74,7 +74,9 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
      - **Use External Emojis** (For better message formatting)
    - Use the generated URL to invite the bot to your server
    - **If you want the bot to auto-create channels for notifications and events, grant it the `Manage Channels` permission.**
-   - The bot will auto-create (or use) two channels: one for notifications and one for events (default names: `notification`, `event`).
+   - The bot will auto-create (or use) two channels:
+     - **Notification channel** (public): For general notices like First Blood, New Challenges
+     - **Event channel** (private): For sensitive data like flag submissions, user activities
    - You can customize these names via environment variables (see below).
 
 5. **Configure Environment**
@@ -116,8 +118,8 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
 | `DISCORD_TOKEN` | Discord bot token | Yes | - |
 | `DISCORD_CHANNEL_ID` | Discord channel ID for notifications | Yes* | - |
 | `DISCORD_GUILD_ID` | Discord guild ID (server) | Yes | - |
-| `NOTIFICATION_CHANNEL_NAME` | Name of the notification channel (auto-created if missing) | No | `notification` |
-| `EVENT_CHANNEL_NAME` | Name of the event channel (auto-created if missing) | No | `event` |
+| `NOTIFICATION_CHANNEL_NAME` | Name of the public notification channel (auto-created if missing) | No | `notification` |
+| `EVENT_CHANNEL_NAME` | Name of the private event channel (auto-created if missing) | No | `event` |
 | `GAME_ID` | GZCTF game ID to monitor | Yes | - |
 | `POLL_INTERVAL` | Polling interval in seconds | No | `30` |
 | `ENABLE_NOTICES` | Enable game notices | No | `true` |
@@ -148,8 +150,34 @@ python main.py
 The bot will:
 1. Authenticate with GZCTF platform
 2. Connect to Discord
-3. Start polling for notifications every 30 seconds (configurable)
-4. Send formatted notifications to the specified Discord channel
+3. Create/setup channels:
+   - **Public notification channel**: For general notices (First Blood, New Challenges, etc.)
+   - **Private event channel**: For sensitive data (flag submissions, user activities, etc.)
+4. Start polling for notifications every 30 seconds (configurable)
+5. Send formatted notifications to the appropriate Discord channels
+
+### Private Event Channel Management
+
+The bot automatically creates a private event channel that only administrators and the bot can access. This protects sensitive information like:
+- Flag submission attempts and results
+- User activity logs
+- Container start/stop events
+- Cheat detection alerts
+
+#### Commands for Managing Event Channel Access:
+
+```bash
+!setup_event_channel          # Setup or fix event channel permissions (Admin only)
+!add_event_access @user       # Grant a user read access to event channel (Admin only)
+!remove_event_access @user    # Revoke a user's access to event channel (Admin only)
+!list_event_access            # List users with event channel access (Admin only)
+```
+
+#### Default Permissions:
+- **@everyone**: No access (cannot see the channel)
+- **Bot**: Full access (can send messages and embeds)
+- **Admin/Moderator roles**: Full access (automatically detected)
+- **Manually added users**: Read-only access
 
 ### Debugging
 
