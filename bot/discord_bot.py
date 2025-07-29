@@ -34,8 +34,10 @@ class GZCTFNotificationBot(commands.Bot):
         self.enable_notices = config.enable_notices
         self.enable_events = config.enable_events
         
-        # State file for persistent storage
-        self.state_file = f"bot_state_game_{self.game_id}.json"
+        # State file for persistent storage - use volume mount
+        state_dir = os.getenv("STATE_DIR", "/app/data")
+        os.makedirs(state_dir, exist_ok=True)
+        self.state_file = os.path.join(state_dir, f"bot_state_game_{self.game_id}.json")
         
         # Load previous state or initialize
         self.last_notice_id = None
@@ -52,9 +54,16 @@ class GZCTFNotificationBot(commands.Bot):
         # Notification formatter with config
         self.formatter = NotificationFormatter(config)
         
+        # Game info cache
+        self.game_title = None
+        self.last_game_info_fetch = None
+        
         # Start polling task
         self.poll_notifications.change_interval(seconds=self.poll_interval)
         self.poll_notifications.start()
+        
+        # Start game info update task (every 30 minutes)
+        self.update_game_info.start()
         
 
     
@@ -109,16 +118,8 @@ class GZCTFNotificationBot(commands.Bot):
         if event_channel:
             self.event_channel_id = event_channel.id
 
-        # Set bot status
-        status_text = f"GZCTF Game {self.game_id}"
-        if not self.enable_events or not self.event_channel_id or self.events_disabled_due_to_auth:
-            status_text += " (Notices Only)"
-        await self.change_presence(
-            activity=discord.Activity(
-                type=discord.ActivityType.watching, 
-                name=status_text
-            )
-        )
+        # Fetch game info and set bot status
+        await self.fetch_and_update_status()
     
     @tasks.loop(seconds=30)
     async def poll_notifications(self):
@@ -173,6 +174,68 @@ class GZCTFNotificationBot(commands.Bot):
     async def before_poll_notifications(self):
         """Wait until bot is ready before starting polling"""
         await self.wait_until_ready()
+    
+    @tasks.loop(minutes=30)
+    async def update_game_info(self):
+        """Update game info and bot status every 30 minutes"""
+        await self.fetch_and_update_status()
+    
+    @update_game_info.before_loop
+    async def before_update_game_info(self):
+        """Wait until bot is ready before starting game info updates"""
+        await self.wait_until_ready()
+    
+    async def fetch_and_update_status(self):
+        """Fetch game info and update bot status"""
+        try:
+            # Check if we're authenticated
+            if not await self.gzctf_client.is_authenticated():
+                logger.warning("Not authenticated, attempting to authenticate for game info...")
+                if not await self.gzctf_client.authenticate():
+                    logger.error("Failed to authenticate for game info")
+                    return
+            
+            # Fetch game info
+            game_info = await self.gzctf_client.get_game_info(self.game_id)
+            if game_info:
+                self.game_title = game_info.get('title', f'Game {self.game_id}')
+                self.last_game_info_fetch = datetime.utcnow()
+                logger.info(f"Updated game title: {self.game_title}")
+                # Save state when we successfully update game title
+                self.save_state()
+            else:
+                logger.warning(f"Failed to fetch game info for ID {self.game_id}")
+                if not self.game_title:
+                    self.game_title = f"Game {self.game_id}"
+            
+            # Update bot status
+            await self.update_bot_status()
+            
+        except Exception as e:
+            logger.error(f"Error updating game info: {e}")
+            if not self.game_title:
+                self.game_title = f"Game {self.game_id}"
+            await self.update_bot_status()
+    
+    async def update_bot_status(self):
+        """Update bot status with current game title"""
+        try:
+            status_text = self.game_title or f"Game {self.game_id}"
+            
+            # Add status indicators
+            if not self.enable_events or not self.event_channel_id or self.events_disabled_due_to_auth:
+                status_text += " (Notices Only)"
+            
+            await self.change_presence(
+                activity=discord.Activity(
+                    type=discord.ActivityType.watching, 
+                    name=status_text
+                )
+            )
+            logger.debug(f"Updated bot status: {status_text}")
+            
+        except Exception as e:
+            logger.error(f"Error updating bot status: {e}")
     
     async def process_notices(self, notices: List[Dict[str, Any]]):
         """Process and send new notices to Discord"""
@@ -321,7 +384,8 @@ class GZCTFNotificationBot(commands.Bot):
                     self.last_event_time = state.get('last_event_time')
                     self.events_failure_count = state.get('events_failure_count', 0)
                     self.events_disabled_due_to_auth = state.get('events_disabled_due_to_auth', False)
-                    logger.info(f"Loaded state: last_notice_id={self.last_notice_id}, last_event_time={self.last_event_time}, events_disabled={self.events_disabled_due_to_auth}")
+                    self.game_title = state.get('game_title')
+                    logger.info(f"Loaded state: last_notice_id={self.last_notice_id}, last_event_time={self.last_event_time}, events_disabled={self.events_disabled_due_to_auth}, game_title={self.game_title}")
             else:
                 logger.info("No previous state found, starting fresh")
         except Exception as e:
@@ -330,6 +394,7 @@ class GZCTFNotificationBot(commands.Bot):
             self.last_event_time = None
             self.events_failure_count = 0
             self.events_disabled_due_to_auth = False
+            self.game_title = None
             
     def save_state(self):
         """Save bot state to file"""
@@ -340,6 +405,7 @@ class GZCTFNotificationBot(commands.Bot):
                 'events_failure_count': self.events_failure_count,
                 'events_disabled_due_to_auth': self.events_disabled_due_to_auth,
                 'game_id': self.game_id,
+                'game_title': self.game_title,
                 'timestamp': datetime.utcnow().isoformat()
             }
             with open(self.state_file, 'w') as f:

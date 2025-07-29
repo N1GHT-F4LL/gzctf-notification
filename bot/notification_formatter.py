@@ -14,8 +14,8 @@ class NotificationFormatter:
         # Color mapping for different notification types
         self.notice_colors = {
             "FirstBlood": 0xFF0000,    # Red
-            "SecondBlood": 0xFF6600,   # Orange
-            "ThirdBlood": 0xFFCC00,    # Yellow
+            "SecondBlood": 0xFF0000,   # Red
+            "ThirdBlood": 0xFF0000,    # Red
             "NewHint": 0x00CCFF,       # Light Blue
             "NewChallenge": 0x00FF00,  # Green
             "Normal": 0x808080         # Gray
@@ -28,13 +28,6 @@ class NotificationFormatter:
             "NewHint": "💡",
             "NewChallenge": "🎯",
             "Normal": "📢"
-        }
-        self.event_emojis = {
-            "FlagSubmit": "🚩",
-            "ContainerStart": "▶️",
-            "ContainerDestroy": "⏹️",
-            "CheatDetected": "⚠️",
-            "Normal": "📝"
         }
         self.event_colors = {
             "FlagSubmit": 0x00FF00,      # Green for flag submissions
@@ -51,20 +44,20 @@ class NotificationFormatter:
             values = notice.get('values', [])
             notice_id = notice.get('id', 'Unknown')
             time = notice.get('time', 0)
-            # Log formatting attempt
+            
             logger.debug(f"Formatting notice - Type: {notice_type}, ID: {notice_id}, Values: {values}")
-            # Get color for this notice type
+            
             color = self.notice_colors.get(notice_type, 0x808080)
-            # Create embed
+            
             embed = discord.Embed(
                 title=self._format_notice_title(notice_type),
                 description=self._format_notice_content(notice_type, values),
                 color=color,
                 timestamp=self._timestamp_to_datetime(time)
             )
-            # Add footer
+            
             embed.set_footer(text=f"Notice ID: {notice_id}")
-            # Log successful formatting
+            
             logger.debug(f"Successfully formatted notice - Type: {notice_type}, Title: {embed.title}")
             return embed
         except Exception as e:
@@ -72,7 +65,7 @@ class NotificationFormatter:
             return None
     
     def format_event(self, event: Dict[str, Any]) -> Optional[discord.Embed]:
-        """Format a game event into a Discord embed"""
+        """Format a game event into a Discord embed - Compact format"""
         try:
             event_type = event.get('type', 'Normal')
             values = event.get('values', [])
@@ -80,32 +73,18 @@ class NotificationFormatter:
             user = event.get('user', 'Unknown')
             team = event.get('team', 'Unknown')
             
-            # Log formatting attempt
             logger.debug(f"Formatting event - Type: {event_type}, User: {user}, Team: {team}, Values: {values}")
             
-            # Get color for this event type (with special handling for flag submissions)
             color = self._get_event_color(event_type, values)
             
-            # Create embed
+            # Create compact embed with all info in title
             embed = discord.Embed(
-                title=self._format_event_title(event_type, values),
-                description=self._format_event_content(event_type, values, event),
+                title=self._format_event_title(event_type, values, user, team),
+                description=self._format_event_content(event_type, values),
                 color=color,
                 timestamp=self._timestamp_to_datetime(time)
             )
             
-            # Add user and team info if available
-            if user and user != 'Unknown':
-                embed.add_field(name="👤 User", value=f"`{user}`", inline=True)
-            if team and team != 'Unknown':
-                embed.add_field(name="👥 Team", value=f"**{team}**", inline=True)
-            
-            # Add challenge info for certain event types
-            if event_type in ["FlagSubmit", "ContainerStart", "ContainerDestroy"] and len(values) >= 2:
-                challenge = values[2] if event_type == "FlagSubmit" else values[1]
-                embed.add_field(name="🎯 Challenge", value=f"**{challenge}**", inline=True)
-            
-            # Log successful formatting
             logger.debug(f"Successfully formatted event - Type: {event_type}, Title: {embed.title}")
             return embed
         except Exception as e:
@@ -113,7 +92,7 @@ class NotificationFormatter:
             return None
     
     def _format_notice_title(self, notice_type: str) -> str:
-        """Format notice type into a readable title - Compact format, dùng emoji động nếu có"""
+        """Format notice type into a readable title"""
         emoji = self.notice_emojis.get(notice_type, "")
         titles = {
             "FirstBlood": "First Blood",
@@ -125,26 +104,52 @@ class NotificationFormatter:
         }
         return f"{emoji} {titles.get(notice_type, 'Notice')}".strip()
     
-    def _format_event_title(self, event_type: str, values: list = None) -> str:
-        """Format event type into a readable title with dynamic content"""
+    def _format_event_title(self, event_type: str, values: list = None, user: str = None, team: str = None) -> str:
+        """Format event type into a compact title with all essential info"""
+        # Clean user and team info
+        user_display = user if user and user != 'Unknown' else ""
+        team_display = team if team and team != 'Unknown' else ""
+        
+        # Create user info string
+        if user_display and team_display:
+            user_info = f"{user_display} ({team_display})"
+        elif user_display:
+            user_info = user_display
+        elif team_display:
+            user_info = f"({team_display})"
+        else:
+            user_info = ""
+        
         if event_type == "FlagSubmit" and values and len(values) >= 3:
             result = values[0]
             challenge = values[2]
             if result == "Accepted":
-                return f"🎉 {challenge} - Flag Accepted!"
+                return f"🎉 {user_info} solved {challenge}"
             elif result == "WrongAnswer":
-                return f"❌ {challenge} - Wrong Flag"
+                return f"❌ {user_info} - Wrong flag on {challenge}"
             else:
-                return f"🚩 {challenge} - Flag {result}"
+                return f"🚩 {user_info} - {result} on {challenge}"
         
+        elif event_type == "ContainerStart" and values and len(values) >= 2:
+            challenge = values[1]
+            return f"🐳 {user_info} started {challenge}"
+        
+        elif event_type == "ContainerDestroy" and values and len(values) >= 2:
+            challenge = values[1]
+            return f"🛑 {user_info} stopped {challenge}"
+        
+        elif event_type == "CheatDetected":
+            return f"🚨 Suspicious activity - {user_info}"
+        
+        # Fallback titles
         titles = {
-            "FlagSubmit": "🚩 Flag Submission",
-            "ContainerStart": "🚀 Container Started",
-            "ContainerDestroy": "🛑 Container Stopped",
-            "CheatDetected": "🚨 Cheat Alert",
-            "Normal": "📝 Event"
+            "FlagSubmit": f"🚩 {user_info} - Flag Submission",
+            "ContainerStart": f"🐳 {user_info} - Container Started",
+            "ContainerDestroy": f"🛑 {user_info} - Container Stopped",
+            "CheatDetected": f"🚨 {user_info} - Cheat Alert",
+            "Normal": f"📝 {user_info} - Event"
         }
-        return titles.get(event_type, "📝 Event")
+        return titles.get(event_type, f"📝 {user_info} - Event").strip()
     
     def _get_event_color(self, event_type: str, values: list = None) -> int:
         """Get color for event based on type and values"""
@@ -160,7 +165,7 @@ class NotificationFormatter:
         return self.event_colors.get(event_type, 0x808080)
     
     def _format_notice_content(self, notice_type: str, values: list) -> str:
-        """Format notice content based on type and values - Compact 2-line format"""
+        """Format notice content based on type and values"""
         if not values:
             return "No additional information available."
         
@@ -169,7 +174,7 @@ class NotificationFormatter:
                 challenge = values[0]
                 team = values[1]
                 blood_type = "FIRST BLOOD" if notice_type == "FirstBlood" else "SECOND BLOOD" if notice_type == "SecondBlood" else "THIRD BLOOD"
-                return f"**{team}** has achieved **{blood_type}** on **{challenge}**!"
+                return f"**{team}** achieved **{blood_type}** on **{challenge}**!"
             else:
                 return " ".join(values)
         
@@ -177,9 +182,9 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 hint = values[1]
-                return f"New hint available for **{challenge}**!\n💡 **Hint**: {hint}"
+                return f"New hint for **{challenge}**!\n💡 {hint}"
             else:
-                return f"New hint available for **{values[0] if values else 'Unknown Challenge'}**!"
+                return f"New hint for **{values[0] if values else 'Unknown Challenge'}**!"
         
         elif notice_type == "NewChallenge":
             if values:
@@ -191,79 +196,30 @@ class NotificationFormatter:
         else:
             return " ".join(values)
     
-    def _format_event_content(self, event_type: str, values: list, event: Dict[str, Any] = None) -> str:
-        """Format event content based on type and values - Enhanced formatting"""
+    def _format_event_content(self, event_type: str, values: list) -> str:
+        """Format event content - minimal and focused on unique info only"""
         if not values:
-            return "No additional information available."
+            return ""
         
-        user = event.get('user', 'Unknown') if event else 'Unknown'
-        team = event.get('team', 'Unknown') if event else 'Unknown'
+        if event_type == "FlagSubmit" and len(values) >= 2:
+            flag = values[1]
+            # Truncate long flags for display
+            display_flag = flag if len(flag) <= 40 else f"{flag[:37]}..."
+            return f"Flag: `{display_flag}`"
         
-        if event_type == "FlagSubmit":
-            if len(values) >= 3:
-                result = values[0]  # Accepted/WrongAnswer
-                flag = values[1]    # The flag submitted
-                challenge = values[2]  # Challenge name
-                challenge_id = values[3] if len(values) > 3 else ""
-                
-                # Format result with emoji
-                if result == "Accepted":
-                    result_emoji = "✅"
-                    result_text = "**ACCEPTED**"
-                    result_color = "�"
-                elif result == "WrongAnswer":
-                    result_emoji = "❌"
-                    result_text = "**WRONG ANSWER**"
-                    result_color = "🔴"
-                else:
-                    result_emoji = "📝"
-                    result_text = f"**{result}**"
-                    result_color = "🟡"
-                
-                # Truncate long flags for display
-                display_flag = flag if len(flag) <= 50 else f"{flag[:47]}..."
-                
-                return f"Submitted flag: `{display_flag}`"
-            else:
-                return f"Flag submission: {' '.join(values)}"
+        elif event_type in ["ContainerStart", "ContainerDestroy"] and len(values) >= 1:
+            container_id = values[0]
+            return f"Container ID: `{container_id}`"
         
-        elif event_type == "ContainerStart":
-            if len(values) >= 2:
-                container_id = values[0]
-                challenge = values[1]
-                return f"🚀 **{challenge}** container started\n📦 Container ID: `{container_id}`"
-            elif values:
-                challenge = values[0]
-                return f"🚀 **{challenge}** container started"
-            else:
-                return "🚀 Container started"
+        elif event_type == "CheatDetected" and values:
+            details = ' '.join(values)
+            return f"Details: {details}"
         
-        elif event_type == "ContainerDestroy":
-            if len(values) >= 2:
-                container_id = values[0]
-                challenge = values[1]
-                return f"🛑 **{challenge}** container destroyed\n📦 Container ID: `{container_id}`"
-            elif values:
-                challenge = values[0]
-                return f"🛑 **{challenge}** container destroyed"
-            else:
-                return "🛑 Container destroyed"
-        
-        elif event_type == "CheatDetected":
-            if values:
-                details = ' '.join(values)
-                return f"🚨 **Suspicious activity detected!**\n📋 Details: {details}"
-            else:
-                return "🚨 **Suspicious activity detected!**"
-        
-        else:
-            # Generic event formatting
-            return f"📝 **Event Details:**\n{' '.join(values)}"
+        return ""
     
     def _timestamp_to_datetime(self, timestamp: int) -> datetime:
         """Convert Unix timestamp to datetime"""
         try:
-            # Handle different timestamp formats
             if isinstance(timestamp, (int, float)):
                 # Check if timestamp is in seconds or milliseconds
                 if timestamp > 1e10:  # Likely milliseconds
@@ -272,5 +228,4 @@ class NotificationFormatter:
             else:
                 return datetime.now()
         except (ValueError, TypeError, OSError):
-            # Return current time if timestamp is invalid
-            return datetime.now() 
+            return datetime.now()

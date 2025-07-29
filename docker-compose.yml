@@ -1,27 +1,34 @@
 services:
-  gzctf-discord-bot:
-    build: .
+  gzctf-bot:
+    build: 
+      context: .
+      dockerfile: Dockerfile
     container_name: gzctf-discord-bot
     restart: unless-stopped
-    environment:
-      # GZCTF Configuration
-      - GZCTF_BASE_URL=${GZCTF_BASE_URL:-http://localhost:8080}
-      - GZCTF_USERNAME=${GZCTF_USERNAME}
-      - GZCTF_PASSWORD=${GZCTF_PASSWORD}
-      # Discord Configuration
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
-      # Bot Configuration
-      - GAME_ID=${GAME_ID}
-      - POLL_INTERVAL=${POLL_INTERVAL:-30}
-      - ENABLE_NOTICES=${ENABLE_NOTICES:-true}
-      - ENABLE_EVENTS=${ENABLE_EVENTS:-true}
-      - DEBUG=${DEBUG:-false}
+    
+    # Environment variables from .env file
+    env_file:
+      - .env
+    
+    # Docker volumes for persistent data
     volumes:
-      - ./bot:/app/bot
-    networks:
-      - gzctf-network
+      - gzctf-bot-data:/app/data
+      - gzctf-bot-logs:/app/logs
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1G"
+        max-file: "5"
+
+# Named volumes
+volumes:
+  gzctf-bot-data:
+    driver: local
+  gzctf-bot-logs:
+    driver: local
 
 networks:
-  gzctf-network:
-    driver: bridge 
+  default:
+    driver: bridge

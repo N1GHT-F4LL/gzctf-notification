@@ -1,22 +1,49 @@
-# Ignore Python cache and compiled files
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Data and logs (will be mounted as volumes)
+data/
+logs/
+*.log
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
 
-# Ignore git and VCS
-.git
-.gitignore
+# Virtual environments
+venv/
+env/
+ENV/
 
-# Ignore environment and log files
-.env
-*.log
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Ignore test and other unnecessary folders
-*.md
-test/
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+docs/
+
+# Scripts (not needed in container)
 scripts/
+*.sh
 
-# Ignore Docker artifacts
-Dockerfile
-docker-compose.yml
+# State files (will be in volume)
+bot_state_*.json

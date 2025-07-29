@@ -264,4 +264,56 @@ class GZCTFClient:
                     
         except Exception as e:
             logger.error(f"Error fetching games: {e}")
-            return [] 
+            return []
+    
+    async def get_game_info(self, game_id: int) -> Optional[Dict[str, Any]]:
+        """Get detailed information about a specific game"""
+        try:
+            base_url = self.config.base_url.rstrip('/')
+            url = f"{base_url}/api/game/{game_id}"
+            
+            async with self.session.get(
+                url, 
+                headers=self._get_headers()
+            ) as response:
+                logger.debug(f"Game info response status: {response.status}")
+                
+                if response.status == 200:
+                    try:
+                        data = await response.json()
+                        logger.info(f"Successfully fetched game info for ID {game_id}: {data.get('title', 'Unknown')}")
+                        return data
+                    except Exception as json_error:
+                        logger.error(f"Failed to parse game info JSON response: {json_error}")
+                        logger.debug(f"Response content: {await response.text()}")
+                        return None
+                elif response.status == 401:
+                    # Try to re-authenticate on 401 error
+                    logger.warning("Received 401 error for game info, attempting to re-authenticate...")
+                    if await self.authenticate():
+                        logger.info("Re-authentication successful, retrying game info request...")
+                        # Retry the request with new authentication
+                        async with self.session.get(url, headers=self._get_headers()) as retry_response:
+                            if retry_response.status == 200:
+                                try:
+                                    data = await retry_response.json()
+                                    logger.info(f"Successfully fetched game info after re-auth for ID {game_id}: {data.get('title', 'Unknown')}")
+                                    return data
+                                except Exception as json_error:
+                                    logger.error(f"Failed to parse game info JSON response after retry: {json_error}")
+                                    return None
+                            else:
+                                logger.error(f"Failed to get game info after re-auth: {retry_response.status}")
+                                logger.debug(f"Response content: {await retry_response.text()}")
+                                return None
+                    else:
+                        logger.error("Re-authentication failed for game info")
+                        return None
+                else:
+                    logger.error(f"Failed to get game info: {response.status}")
+                    logger.debug(f"Response content: {await response.text()}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error fetching game info for ID {game_id}: {e}")
+            return None 

@@ -29,7 +29,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('gzctf_bot.log')
+        logging.FileHandler('logs/gzctf_bot.log')
     ]
 )
 
