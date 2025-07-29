@@ -174,6 +174,9 @@ class NotificationFormatter:
             notice_id = notice.get('id', 'Unknown')
             time = notice.get('time', 0)
             
+            # Log formatting attempt
+            logger.debug(f"Formatting notice - Type: {notice_type}, ID: {notice_id}, Values: {values}")
+            
             # Get color and emoji for this notice type
             color = self.notice_colors.get(notice_type, 0x808080)
             emoji = self.notice_emojis.get(notice_type, "📢")
@@ -189,6 +192,9 @@ class NotificationFormatter:
             # Add footer
             embed.set_footer(text=f"Notice ID: {notice_id}")
             
+            # Log successful formatting
+            logger.debug(f"Successfully formatted notice - Type: {notice_type}, Title: {embed.title}")
+            
             return embed
             
         except Exception as e:
@@ -203,6 +209,9 @@ class NotificationFormatter:
             time = event.get('time', 0)
             user = event.get('user', 'Unknown')
             team = event.get('team', 'Unknown')
+            
+            # Log formatting attempt
+            logger.debug(f"Formatting event - Type: {event_type}, User: {user}, Team: {team}, Values: {values}")
             
             # Get color and emoji for this event type
             color = self.event_colors.get(event_type, 0x808080)
@@ -222,6 +231,9 @@ class NotificationFormatter:
             if team and team != 'Unknown':
                 embed.add_field(name="Team", value=team, inline=True)
             
+            # Log successful formatting
+            logger.debug(f"Successfully formatted event - Type: {event_type}, Title: {embed.title}")
+            
             return embed
             
         except Exception as e:
@@ -229,30 +241,30 @@ class NotificationFormatter:
             return None
     
     def _format_notice_title(self, notice_type: str) -> str:
-        """Format notice type into a readable title"""
+        """Format notice type into a readable title - Compact format"""
         titles = {
-            "FirstBlood": "🥇 FIRST BLOOD!",
-            "SecondBlood": "🥈 SECOND BLOOD!",
-            "ThirdBlood": "🥉 THIRD BLOOD!",
-            "NewHint": "💡 New Hint Available",
-            "NewChallenge": "🎯 New Challenge Released",
-            "Normal": "📢 Game Notice"
+            "FirstBlood": "🥇 First Blood",
+            "SecondBlood": "🥈 Second Blood", 
+            "ThirdBlood": "🥉 Third Blood",
+            "NewHint": "💡 New Hint",
+            "NewChallenge": "🎯 New Challenge",
+            "Normal": "📢 Notice"
         }
-        return titles.get(notice_type, "Game Notice")
+        return titles.get(notice_type, "Notice")
     
     def _format_event_title(self, event_type: str) -> str:
-        """Format event type into a readable title"""
+        """Format event type into a readable title - Compact format"""
         titles = {
-            "FlagSubmit": "🚩 Flag Submission",
-            "ContainerStart": "▶️ Container Started",
-            "ContainerDestroy": "⏹️ Container Destroyed",
-            "CheatDetected": "⚠️ Cheat Detected!",
-            "Normal": "📝 Game Event"
+            "FlagSubmit": "🚩 Flag Submit",
+            "ContainerStart": "▶️ Container Start",
+            "ContainerDestroy": "⏹️ Container Destroy",
+            "CheatDetected": "⚠️ Cheat Detected",
+            "Normal": "📝 Event"
         }
-        return titles.get(event_type, "Game Event")
+        return titles.get(event_type, "Event")
     
     def _format_notice_content(self, notice_type: str, values: list) -> str:
-        """Format notice content based on type and values"""
+        """Format notice content based on type and values - Compact 2-line format"""
         if not values:
             return "No additional information available."
         
@@ -260,12 +272,8 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 team = values[1]
-                if notice_type == "FirstBlood":
-                    return random.choice(self.first_blood_messages).format(team=team, challenge=challenge)
-                elif notice_type == "SecondBlood":
-                    return random.choice(self.second_blood_messages).format(team=team, challenge=challenge)
-                else:  # ThirdBlood
-                    return random.choice(self.third_blood_messages).format(team=team, challenge=challenge)
+                blood_type = "FIRST BLOOD" if notice_type == "FirstBlood" else "SECOND BLOOD" if notice_type == "SecondBlood" else "THIRD BLOOD"
+                return f"**{team}** has achieved **{blood_type}** on **{challenge}**!"
             else:
                 return " ".join(values)
         
@@ -273,22 +281,22 @@ class NotificationFormatter:
             if len(values) >= 2:
                 challenge = values[0]
                 hint = values[1]
-                return random.choice(self.new_hint_messages).format(challenge=challenge) + f"\n\n💡 **Hint**: {hint}"
+                return f"New hint available for **{challenge}**!\n💡 **Hint**: {hint}"
             else:
-                return random.choice(self.new_hint_messages).format(challenge=values[0] if values else "Unknown Challenge")
+                return f"New hint available for **{values[0] if values else 'Unknown Challenge'}**!"
         
         elif notice_type == "NewChallenge":
             if values:
                 challenge = values[0]
-                return random.choice(self.new_challenge_messages).format(challenge=challenge)
+                return f"**{challenge}** is now available!"
             else:
-                return random.choice(self.new_challenge_messages).format(challenge="Unknown Challenge")
+                return "New challenge is now available!"
         
         else:
             return " ".join(values)
     
     def _format_event_content(self, event_type: str, values: list, event: Dict[str, Any] = None) -> str:
-        """Format event content based on type and values"""
+        """Format event content based on type and values - Compact 2-line format"""
         if not values:
             return "No additional information available."
         
@@ -300,43 +308,40 @@ class NotificationFormatter:
                 team = event.get('team', 'Unknown') if event else 'Unknown'
                 
                 if result == "Accepted":
-                    result_message = "✅ **ACCEPTED!** - *Excellent work!* ✅"
+                    result_emoji = "✅"
+                    result_text = "ACCEPTED"
                 elif result == "WrongAnswer":
-                    result_message = "❌ **WRONG ANSWER** - *Keep trying!* ❌"
+                    result_emoji = "❌"
+                    result_text = "WRONG"
                 else:
-                    result_message = f"📝 **{result}** - *Interesting attempt!* 📝"
+                    result_emoji = "📝"
+                    result_text = result
                 
-                return random.choice(self.flag_submit_messages).format(
-                    user=user, team=team, challenge=challenge, result_message=result_message
-                )
+                return f"**{user}** from **{team}** submitted flag for **{challenge}**!\n{result_emoji} **{result_text}**"
             else:
                 return " ".join(values)
         
         elif event_type == "ContainerStart":
             if values:
                 challenge = values[0]
-                return random.choice(self.container_start_messages).format(challenge=challenge)
+                return f"Container for **{challenge}** has been started!"
             else:
-                return random.choice(self.container_start_messages).format(challenge="Unknown Challenge")
+                return "Container has been started!"
         
         elif event_type == "ContainerDestroy":
             if values:
                 challenge = values[0]
-                return random.choice(self.container_destroy_messages).format(challenge=challenge)
+                return f"Container for **{challenge}** has been destroyed!"
             else:
-                return random.choice(self.container_destroy_messages).format(challenge="Unknown Challenge")
+                return "Container has been destroyed!"
         
         elif event_type == "CheatDetected":
             user = event.get('user', 'Unknown') if event else 'Unknown'
             team = event.get('team', 'Unknown') if event else 'Unknown'
             if values:
-                return random.choice(self.cheat_detected_messages).format(
-                    user=user, team=team
-                ) + f"\n\n🚨 **Details**: {' '.join(values)}"
+                return f"**{user}** from **{team}** flagged for suspicious activity!\n🚨 **Details**: {' '.join(values)}"
             else:
-                return random.choice(self.cheat_detected_messages).format(
-                    user=user, team=team
-                )
+                return f"**{user}** from **{team}** flagged for suspicious activity!"
         
         else:
             return " ".join(values)

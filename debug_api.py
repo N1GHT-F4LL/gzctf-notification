@@ -82,48 +82,92 @@ async def debug_api():
             print("❌ No authentication method configured")
             headers = {}
         
-        # Test API endpoints
+        # Test API endpoints based on actual API structure
         base_url = config.gzctf.base_url.rstrip('/')
         
         endpoints = [
-            "/api/games",
-            f"/api/game/{config.game_id}/notices",
-            f"/api/game/{config.game_id}/events"
+            {
+                "url": f"/api/game/{config.game_id}/notices",
+                "params": {"count": 5, "skip": 0},
+                "name": "Game Notices"
+            },
+            {
+                "url": f"/api/game/{config.game_id}/events", 
+                "params": {"count": 5, "skip": 0, "hideContainer": False},
+                "name": "Game Events"
+            }
         ]
         
         for endpoint in endpoints:
-            print(f"\n🔗 Testing endpoint: {endpoint}")
+            print(f"\n🔗 Testing endpoint: {endpoint['name']}")
+            print(f"   URL: {endpoint['url']}")
+            print(f"   Parameters: {endpoint['params']}")
+            
             try:
-                url = f"{base_url}{endpoint}"
-                params = {}
+                url = f"{base_url}{endpoint['url']}"
                 
-                # Add specific parameters for events endpoint
-                if "events" in endpoint:
-                    params = {"count": 5, "skip": 0, "hideContainer": "false"}
-                elif "notices" in endpoint:
-                    params = {"count": 5, "skip": 0}
-                
-                async with session.get(url, params=params, headers=headers) as response:
+                async with session.get(url, params=endpoint['params'], headers=headers) as response:
                     print(f"   Status: {response.status}")
                     print(f"   Content-Type: {response.headers.get('content-type', 'unknown')}")
-                    print(f"   URL: {response.url}")
+                    print(f"   Final URL: {response.url}")
                     
                     if response.status == 200:
                         try:
                             data = await response.json()
                             print(f"   ✅ JSON response: {len(data) if isinstance(data, list) else 'object'}")
                             if isinstance(data, list) and len(data) > 0:
-                                print(f"   Sample data: {json.dumps(data[0], indent=2)[:200]}...")
+                                print(f"   Sample data structure:")
+                                sample = data[0]
+                                print(f"     - Type: {sample.get('type', 'N/A')}")
+                                print(f"     - Values: {sample.get('values', [])}")
+                                print(f"     - Time: {sample.get('time', 'N/A')}")
+                                if 'id' in sample:
+                                    print(f"     - ID: {sample.get('id', 'N/A')}")
+                                if 'user' in sample:
+                                    print(f"     - User: {sample.get('user', 'N/A')}")
+                                if 'team' in sample:
+                                    print(f"     - Team: {sample.get('team', 'N/A')}")
+                                print(f"     - Full sample: {json.dumps(sample, indent=2)[:300]}...")
                         except Exception as json_error:
                             text = await response.text()
                             print(f"   ❌ JSON parse error: {json_error}")
                             print(f"   Response text: {text[:500]}...")
+                    elif response.status == 401:
+                        print(f"   ❌ Unauthorized - Check authentication")
+                    elif response.status == 403:
+                        print(f"   ❌ Forbidden - Check permissions")
+                    elif response.status == 404:
+                        print(f"   ❌ Not Found - Check game ID")
                     else:
                         text = await response.text()
                         print(f"   ❌ Error response: {text[:500]}...")
                         
             except Exception as e:
                 print(f"   ❌ Request error: {e}")
+        
+        # Test games endpoint to verify game ID
+        print(f"\n🔗 Testing games endpoint to verify game ID...")
+        try:
+            url = f"{base_url}/api/edit/games"
+            async with session.get(url, headers=headers) as response:
+                print(f"   Status: {response.status}")
+                if response.status == 200:
+                    try:
+                        games = await response.json()
+                        print(f"   ✅ Found {len(games)} games")
+                        for game in games:
+                            print(f"     - Game ID: {game.get('id')}, Title: {game.get('title')}")
+                            if game.get('id') == config.game_id:
+                                print(f"     ✅ Game ID {config.game_id} is valid!")
+                                break
+                        else:
+                            print(f"     ❌ Game ID {config.game_id} not found!")
+                    except Exception as e:
+                        print(f"   ❌ JSON parse error: {e}")
+                else:
+                    print(f"   ❌ Cannot access games endpoint: {response.status}")
+        except Exception as e:
+            print(f"   ❌ Games endpoint error: {e}")
 
 if __name__ == "__main__":
     asyncio.run(debug_api()) 

@@ -107,6 +107,9 @@ class GZCTFNotificationBot(commands.Bot):
         
         for notice in notices:
             notice_id = notice.get('id')
+            notice_type = notice.get('type', 'Normal')
+            values = notice.get('values', [])
+            time = notice.get('time', 0)
             
             # Skip if we've already seen this notice
             if self.last_notice_id and notice_id <= self.last_notice_id:
@@ -121,7 +124,7 @@ class GZCTFNotificationBot(commands.Bot):
             # Format and send notice
             embed = self.formatter.format_notice(notice)
             if embed:
-                await self.send_notification(embed)
+                await self.send_notification(embed, 'notice', notice_type, values, notice_id, time)
     
     async def process_events(self, events: List[Dict[str, Any]]):
         """Process and send new events to Discord"""
@@ -133,6 +136,10 @@ class GZCTFNotificationBot(commands.Bot):
         
         for event in events:
             event_time = event.get('time', 0)
+            event_type = event.get('type', 'Normal')
+            values = event.get('values', [])
+            user = event.get('user', 'Unknown')
+            team = event.get('team', 'Unknown')
             
             # Skip if we've already seen this event
             if self.last_event_time and event_time <= self.last_event_time:
@@ -147,15 +154,51 @@ class GZCTFNotificationBot(commands.Bot):
             # Format and send event
             embed = self.formatter.format_event(event)
             if embed:
-                await self.send_notification(embed)
+                await self.send_notification(embed, 'event', event_type, values, None, event_time, user, team)
     
-    async def send_notification(self, embed: discord.Embed):
-        """Send notification embed to Discord channel"""
+    async def send_notification(self, embed: discord.Embed, notification_type: str = 'unknown', 
+                              content_type: str = 'Normal', values: List[str] = None, 
+                              notification_id: int = None, timestamp: int = None,
+                              user: str = None, team: str = None):
+        """Send notification embed to Discord channel with detailed logging"""
         try:
             channel = self.get_channel(self.discord_config.channel_id)
             if channel:
                 await channel.send(embed=embed)
-                logger.info(f"Sent notification: {embed.title}")
+                
+                # Create detailed log message
+                log_parts = []
+                log_parts.append(f"Sent {notification_type}: {embed.title}")
+                
+                # Add content type
+                log_parts.append(f"Type: {content_type}")
+                
+                # Add values if available
+                if values:
+                    log_parts.append(f"Values: {values}")
+                
+                # Add user/team for events
+                if notification_type == 'event':
+                    if user and user != 'Unknown':
+                        log_parts.append(f"User: {user}")
+                    if team and team != 'Unknown':
+                        log_parts.append(f"Team: {team}")
+                
+                # Add ID if available
+                if notification_id:
+                    log_parts.append(f"ID: {notification_id}")
+                
+                # Add timestamp if available
+                if timestamp:
+                    try:
+                        dt = datetime.fromtimestamp(timestamp / 1000 if timestamp > 1e10 else timestamp)
+                        log_parts.append(f"Time: {dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                    except:
+                        pass
+                
+                # Log the detailed message
+                logger.info(" | ".join(log_parts))
+                
             else:
                 logger.error(f"Could not find channel {self.discord_config.channel_id}")
                 
