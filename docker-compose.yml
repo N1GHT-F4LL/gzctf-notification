@@ -9,18 +9,17 @@ services:
       - GZCTF_API_TOKEN=${GZCTF_API_TOKEN}
       - GZCTF_USERNAME=${GZCTF_USERNAME}
       - GZCTF_PASSWORD=${GZCTF_PASSWORD}
-      
       # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
       - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
-      
       # Bot Configuration
       - GAME_ID=${GAME_ID}
       - POLL_INTERVAL=${POLL_INTERVAL:-30}
       - ENABLE_NOTICES=${ENABLE_NOTICES:-true}
       - ENABLE_EVENTS=${ENABLE_EVENTS:-true}
-
+    volumes:
+      - ./bot:/app/bot
     networks:
       - gzctf-network
 
