@@ -14,7 +14,6 @@ class GZCTFConfig:
 class DiscordConfig:
     """Discord Bot Configuration"""
     token: str
-    channel_id: int
     guild_id: Optional[int] = None
 
 @dataclass
@@ -56,7 +55,6 @@ def load_config() -> BotConfig:
     # Discord Configuration
     discord_config = DiscordConfig(
         token=os.getenv("DISCORD_TOKEN", ""),
-        channel_id=int(os.getenv("DISCORD_CHANNEL_ID", "0")),
         guild_id=int(os.getenv("DISCORD_GUILD_ID")) if os.getenv("DISCORD_GUILD_ID") else None
     )
     

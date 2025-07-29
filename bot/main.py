@@ -38,24 +38,16 @@ logger = logging.getLogger(__name__)
 async def main():
     """Main function to run the bot"""
     try:
-        
         # Validate required configuration
         if not config.discord.token:
             logger.error("Discord token is required. Set DISCORD_TOKEN environment variable.")
             sys.exit(1)
-            
-        if not config.discord.channel_id:
-            logger.error("Discord channel ID is required. Set DISCORD_CHANNEL_ID environment variable.")
-            sys.exit(1)
-            
         if not config.game_id:
             logger.error("Game ID is required. Set GAME_ID environment variable.")
             sys.exit(1)
-        
         logger.info("Starting GZCTF Discord Notification Bot...")
         logger.info(f"GZCTF URL: {config.gzctf.base_url}")
         logger.info(f"Game ID: {config.game_id}")
-        logger.info(f"Discord Channel: {config.discord.channel_id}")
         logger.info(f"Poll Interval: {config.poll_interval}s")
         logger.info(f"Notices Enabled: {config.enable_notices}")
         logger.info(f"Events Enabled: {config.enable_events}")

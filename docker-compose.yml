@@ -11,7 +11,6 @@ services:
       - GZCTF_PASSWORD=${GZCTF_PASSWORD}
       # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
       - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
       # Bot Configuration
       - GAME_ID=${GAME_ID}

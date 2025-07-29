@@ -58,10 +58,32 @@ class GZCTFNotificationBot(commands.Bot):
         """Called when bot is ready"""
         logger.info(f"Bot logged in as {self.user}")
         logger.info(f"Monitoring game ID: {self.game_id}")
-        logger.info(f"Channel ID: {self.discord_config.channel_id}")
         logger.info(f"Notices enabled: {self.enable_notices}")
         logger.info(f"Events enabled: {self.enable_events}")
-        
+
+        guild = self.get_guild(self.discord_config.guild_id) if self.discord_config.guild_id else None
+        if not guild:
+            logger.error("Guild not found or GUILD_ID not set.")
+            return
+
+        # Lấy tên kênh từ biến môi trường hoặc mặc định
+        notification_channel_name = os.getenv("NOTIFICATION_CHANNEL_NAME", "notification")
+        event_channel_name = os.getenv("EVENT_CHANNEL_NAME", "event")
+
+        # Tạo hoặc lấy kênh notification
+        notification_channel = discord.utils.get(guild.text_channels, name=notification_channel_name)
+        if not notification_channel:
+            notification_channel = await guild.create_text_channel(notification_channel_name)
+            logger.info(f"Created notification channel: {notification_channel.name}")
+        self.notification_channel_id = notification_channel.id
+
+        # Tạo hoặc lấy kênh event
+        event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
+        if not event_channel:
+            event_channel = await guild.create_text_channel(event_channel_name)
+            logger.info(f"Created event channel: {event_channel.name}")
+        self.event_channel_id = event_channel.id
+
         # Set bot status
         status_text = f"GZCTF Game {self.game_id}"
         if not self.enable_events:
@@ -160,9 +182,15 @@ class GZCTFNotificationBot(commands.Bot):
                               content_type: str = 'Normal', values: List[str] = None, 
                               notification_id: int = None, timestamp: int = None,
                               user: str = None, team: str = None):
-        """Send notification embed to Discord channel with detailed logging"""
+        """Send notification embed to correct Discord channel with detailed logging"""
         try:
-            channel = self.get_channel(self.discord_config.channel_id)
+            if notification_type == 'notice':
+                channel = self.get_channel(self.notification_channel_id)
+            elif notification_type == 'event':
+                channel = self.get_channel(self.event_channel_id)
+            else:
+                logger.error(f"Unknown notification type '{notification_type}', cannot send message.")
+                return
             if channel:
                 await channel.send(embed=embed)
                 
@@ -200,7 +228,7 @@ class GZCTFNotificationBot(commands.Bot):
                 logger.info(" | ".join(log_parts))
                 
             else:
-                logger.error(f"Could not find channel {self.discord_config.channel_id}")
+                logger.error(f"Could not find target channel for type '{notification_type}'")
                 
         except Exception as e:
             logger.error(f"Error sending notification: {e}")

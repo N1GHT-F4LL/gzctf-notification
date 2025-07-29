@@ -73,7 +73,9 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
      - **Embed Links** (For rich message formatting)
      - **Use External Emojis** (For better message formatting)
    - Use the generated URL to invite the bot to your server
-   - **Important**: Make sure the bot has access to the specific channel where you want notifications sent
+   - **If you want the bot to auto-create channels for notifications and events, grant it the `Manage Channels` permission.**
+   - The bot will auto-create (or use) two channels: one for notifications and one for events (default names: `notification`, `event`).
+   - You can customize these names via environment variables (see below).
 
 5. **Configure Environment**
    ```bash
@@ -93,6 +95,9 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
    DISCORD_TOKEN=your_discord_bot_token_here
    DISCORD_CHANNEL_ID=1234567890123456789
    DISCORD_GUILD_ID=1234567890123456789
+   # Optional: Custom channel names (default: notification, event)
+   NOTIFICATION_CHANNEL_NAME=notification
+   EVENT_CHANNEL_NAME=event
 
    # Bot Configuration
    GAME_ID=1
@@ -107,20 +112,21 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `GZCTF_BASE_URL` | GZCTF platform URL | Yes | `http://localhost:8080` |
+| `GZCTF_BASE_URL` | GZCTF platform URL | Yes | - |
 | `GZCTF_API_TOKEN` | API token for authentication | No* | - |
 | `GZCTF_USERNAME` | Username for authentication | No* | - |
 | `GZCTF_PASSWORD` | Password for authentication | No* | - |
 | `DISCORD_TOKEN` | Discord bot token | Yes | - |
-| `DISCORD_CHANNEL_ID` | Discord channel ID for notifications | Yes | - |
-| `DISCORD_GUILD_ID` | Discord guild ID (optional) | No | - |
+| `DISCORD_CHANNEL_ID` | Discord channel ID for notifications | Yes* | - |
+| `DISCORD_GUILD_ID` | Discord guild ID (server) | Yes | - |
+| `NOTIFICATION_CHANNEL_NAME` | Name of the notification channel (auto-created if missing) | No | `notification` |
+| `EVENT_CHANNEL_NAME` | Name of the event channel (auto-created if missing) | No | `event` |
 | `GAME_ID` | GZCTF game ID to monitor | Yes | - |
 | `POLL_INTERVAL` | Polling interval in seconds | No | `30` |
 | `ENABLE_NOTICES` | Enable game notices | No | `true` |
 | `ENABLE_EVENTS` | Enable game events | No | `true` |
 | `DEBUG` | Enable debug logging | No | `false` |
-
-*Either API token or username/password is required for authentication.
+*If you use auto-created channels, you can leave `DISCORD_CHANNEL_ID` empty or set it as a fallback.
 
 ### Finding Discord Channel ID
 
