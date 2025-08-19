@@ -33,6 +33,7 @@ class GZCTFNotificationBot(commands.Bot):
         self.poll_interval = config.poll_interval
         self.enable_notices = config.enable_notices
         self.enable_events = config.enable_events
+        self.send_online_message = getattr(config, 'send_online_message', True)
         
         # State file for persistent storage - use volume mount
         # Using root directory since we now mount the entire /app folder
@@ -56,6 +57,7 @@ class GZCTFNotificationBot(commands.Bot):
         # Game info cache
         self.game_title = None
         self.last_game_info_fetch = None
+        self._online_notice_sent: bool = False
 
         # Load persisted state (may set events_disabled_due_to_auth, last_notice_id, etc.)
         self.load_state()
@@ -85,13 +87,11 @@ class GZCTFNotificationBot(commands.Bot):
     async def setup_hook(self):
         """Setup hook called when bot starts"""
         logger.info("Bot setup complete")
-        # Start background tasks here with the configured interval
+        # Defer starting background tasks until after on_ready sends the online message
         try:
-            self.poll_notifications.change_interval(seconds=self.poll_interval)
-            self.poll_notifications.start()
-            self.update_game_info.start()
+            pass
         except Exception as e:
-            logger.error(f"Failed to start background tasks: {e}")
+            logger.error(f"Setup hook error: {e}")
         
 
         
@@ -145,6 +145,24 @@ class GZCTFNotificationBot(commands.Bot):
 
         # Fetch game info and set bot status
         await self.fetch_and_update_status()
+
+        # Send a one-time online message to channels if enabled BEFORE starting polling
+        try:
+            if self.send_online_message and not self._online_notice_sent:
+                await self._send_bot_online_messages()
+                self._online_notice_sent = True
+        except Exception as e:
+            logger.error(f"Failed to send online message: {e}")
+
+        # Now start background tasks with the configured interval
+        try:
+            self.poll_notifications.change_interval(seconds=self.poll_interval)
+            if not self.poll_notifications.is_running():
+                self.poll_notifications.start()
+            if not self.update_game_info.is_running():
+                self.update_game_info.start()
+        except Exception as e:
+            logger.error(f"Failed to start background tasks: {e}")
 
     def _get_channel_names_from_env(self) -> tuple[str, str]:
         """Fetch notification and event channel names from environment with defaults."""
@@ -471,6 +489,32 @@ class GZCTFNotificationBot(commands.Bot):
             
         except Exception as e:
             logger.error(f"Error updating bot status: {e}")
+
+    async def _send_bot_online_messages(self) -> None:
+        """Send a one-time 'Bot Online' embed to notification and event channels if enabled."""
+        title = "🤖 Bot Online"
+        desc = f"Monitoring {self.game_title or f'Game {self.game_id}'}"
+        embed = discord.Embed(title=title, description=desc, color=0x00CC66, timestamp=datetime.now())
+
+        # Notice channel
+        if self.enable_notices and self.notification_channel_id:
+            try:
+                channel = self.get_channel(self.notification_channel_id)
+                if channel and hasattr(channel, 'send'):
+                    await cast(discord.TextChannel, channel).send(embed=embed)
+                    logger.info("Sent 'Bot Online' message to notification channel")
+            except Exception as e:
+                logger.warning(f"Could not send 'Bot Online' to notification channel: {e}")
+
+        # Event channel
+        if self.enable_events and not self.events_disabled_due_to_auth and self.event_channel_id:
+            try:
+                channel = self.get_channel(self.event_channel_id)
+                if channel and hasattr(channel, 'send'):
+                    await cast(discord.TextChannel, channel).send(embed=embed)
+                    logger.info("Sent 'Bot Online' message to event channel")
+            except Exception as e:
+                logger.warning(f"Could not send 'Bot Online' to event channel: {e}")
     
     async def process_notices(self, notices: List[Dict[str, Any]]):
         """Process and send new notices to Discord"""

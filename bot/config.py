@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 
 @dataclass
@@ -24,9 +24,10 @@ class BotConfig:
     game_id: Optional[int] = None
     enable_notices: bool = True
     enable_events: bool = True
-    notice_types: list = None
-    event_types: list = None
+    notice_types: Optional[List[str]] = None
+    event_types: Optional[List[str]] = None
     debug: bool = False
+    send_online_message: bool = True
 
     def __post_init__(self):
         if self.notice_types is None:
@@ -51,20 +52,23 @@ def load_config() -> BotConfig:
     )
     
     # Discord Configuration
+    guild_id_env = os.getenv("DISCORD_GUILD_ID")
     discord_config = DiscordConfig(
         token=os.getenv("DISCORD_TOKEN", ""),
-        guild_id=int(os.getenv("DISCORD_GUILD_ID")) if os.getenv("DISCORD_GUILD_ID") else None
+        guild_id=int(guild_id_env) if guild_id_env and guild_id_env.isdigit() else None
     )
     
     # Bot Configuration
+    game_id_env = os.getenv("GAME_ID")
     config = BotConfig(
         gzctf=gzctf_config,
         discord=discord_config,
         poll_interval=int(os.getenv("POLL_INTERVAL", "30")),
-        game_id=int(os.getenv("GAME_ID")) if os.getenv("GAME_ID") else None,
+        game_id=int(game_id_env) if game_id_env and game_id_env.isdigit() else None,
         enable_notices=os.getenv("ENABLE_NOTICES", "true").lower() == "true",
         enable_events=os.getenv("ENABLE_EVENTS", "true").lower() == "true",
-        debug=os.getenv("DEBUG", "false").lower() == "true"
+        debug=os.getenv("DEBUG", "false").lower() == "true",
+        send_online_message=os.getenv("SEND_ONLINE_MESSAGE", "true").lower() == "true"
     )
     
     return config 
