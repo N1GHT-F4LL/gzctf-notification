@@ -113,21 +113,22 @@ A Discord bot that monitors GZCTF platform for notifications and events, then pu
 
 ### Environment Variables
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `GZCTF_BASE_URL` | GZCTF platform URL | Yes | - |
-| `GZCTF_USERNAME` | Username for authentication | Yes | - |
-| `GZCTF_PASSWORD` | Password for authentication | Yes | - |
-| `DISCORD_TOKEN` | Discord bot token | Yes | - |
-| `DISCORD_GUILD_ID` | Discord guild ID (server) | Yes | - |
-| `NOTIFICATION_CHANNEL_NAME` | Name of the public notification channel | No | `notification` |
-| `EVENT_CHANNEL_NAME` | Name of the private event channel | No | `event` |
-| `GAME_ID` | GZCTF game ID to monitor | Yes | - |
-| `POLL_INTERVAL` | Polling interval in seconds | No | `30` |
-| `ENABLE_NOTICES` | Enable game notices | No | `true` |
-| `ENABLE_EVENTS` | Enable game events | No | `true` |
-| `DEBUG` | Enable debug logging | No | `false` |
-| `TZ` | Timezone | No | `UTC` |
+| Category | Variable | Required | Default | Description |
+|----------|----------|----------|---------|-------------|
+| GZCTF | `GZCTF_BASE_URL` | Yes | - | GZCTF platform URL |
+| GZCTF | `GZCTF_USERNAME` | Yes | - | Monitor user credentials |
+| GZCTF | `GZCTF_PASSWORD` | Yes | - | Monitor user credentials |
+| Discord | `DISCORD_TOKEN` | Yes | - | Bot token |
+| Discord | `DISCORD_GUILD_ID` | Yes | - | Target server ID |
+| Bot | `GAME_ID` | Yes | - | Target game ID |
+| Bot | `POLL_INTERVAL` | No | 30 | Polling frequency (seconds) |
+| Bot | `ENABLE_NOTICES` | No | true | Enable notice monitoring |
+| Bot | `ENABLE_EVENTS` | No | true | Enable event monitoring |
+| Channels | `NOTIFICATION_CHANNEL_NAME` | No | notification | Public channel name |
+| Channels | `EVENT_CHANNEL_NAME` | No | event | Private channel name |
+| System | `DEBUG` | No | false | Debug logging |
+| System | `LOG_DIR` | No | /app/logs | Log directory |
+| System | `TZ` | No | UTC | Timezone |
 
 ### Finding Discord Channel ID
 
