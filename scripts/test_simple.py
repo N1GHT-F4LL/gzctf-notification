@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 # Add the bot directory to the path so we can import 'config' and 'gzctf_client'
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bot'))
 
-from config import load_config
-from gzctf_client import GZCTFClient
+from config import load_config # type: ignore
+from gzctf_client import GZCTFClient # type: ignore
 
 # Load environment variables
 load_dotenv()
