@@ -1,32 +1,42 @@
 import discord
 from discord.ext import commands, tasks
 import logging
-from typing import Dict, Any, List, Optional, cast, Tuple, Union, Mapping
+from typing import (
+    Dict,
+    Any,
+    List,
+    Optional,
+    cast,
+    Tuple,
+    Union,
+    Mapping,
+)
 from datetime import datetime
 import json
 import os
 
-from config import DiscordConfig, BotConfig
+from config import BotConfig
 from gzctf_client import GZCTFClient
 from notification_formatter import NotificationFormatter
 
 logger = logging.getLogger(__name__)
 
+
 class GZCTFNotificationBot(commands.Bot):
     """Discord bot for GZCTF notifications"""
-    
+
     def __init__(self, config: BotConfig, gzctf_client: GZCTFClient):
         # Auth refresh strategy constants
         self.AUTH_CHECK_INTERVAL: int = 100
         self.AUTH_TIME_INTERVAL: int = 3600
         intents = discord.Intents.default()
         intents.message_content = True
-        
+
         super().__init__(command_prefix="!", intents=intents)
-        
+
         # Add slash command support
         # Use the built-in command tree from discord.py
-        
+
         self.config = config
         self.discord_config = config.discord
         self.gzctf_client = gzctf_client
@@ -34,13 +44,15 @@ class GZCTFNotificationBot(commands.Bot):
         self.poll_interval = config.poll_interval
         self.enable_notices = config.enable_notices
         self.enable_events = config.enable_events
-        self.send_online_message = getattr(config, 'send_online_message', True)
-        
+        self.send_online_message = getattr(config, "send_online_message", True)
+
         # State file for persistent storage - use volume mount
         # Using root directory since we now mount the entire /app folder
         state_dir = os.getenv("STATE_DIR", "/app")
         os.makedirs(state_dir, exist_ok=True)
-        self.state_file = os.path.join(state_dir, f"bot_state_game_{self.game_id}.json")
+        self.state_file = os.path.join(
+            state_dir, f"bot_state_game_{self.game_id}.json"
+        )
 
         # Initialize runtime state before any events fire
         self.last_notice_id = None
@@ -62,29 +74,30 @@ class GZCTFNotificationBot(commands.Bot):
 
         # Load persisted state (may set events_disabled_due_to_auth, last_notice_id, etc.)
         self.load_state()
-        
+
     async def close(self):
         """Close the bot and clean up resources"""
         # Ensure GZCTF client session is closed properly
-        if hasattr(self, 'gzctf_client') and self.gzctf_client and hasattr(self.gzctf_client, 'session'):
+        if (
+            hasattr(self, "gzctf_client")
+            and self.gzctf_client
+            and hasattr(self.gzctf_client, "session")
+        ):
             try:
-                if self.gzctf_client.session and not self.gzctf_client.session.closed:
+                if (
+                    self.gzctf_client.session
+                    and not self.gzctf_client.session.closed
+                ):
                     await self.gzctf_client.session.close()
                     logger.info("Closed GZCTF client session")
             except Exception as e:
                 logger.error(f"Error closing GZCTF client session: {e}")
-                
+
         # Call parent close method
         await super().close()
-        
+
         # Do not reinitialize state or start tasks on close
-        
 
-    
-
-    
-
-        
     async def setup_hook(self):
         """Setup hook called when bot starts"""
         logger.info("Bot setup complete")
@@ -93,9 +106,7 @@ class GZCTFNotificationBot(commands.Bot):
             pass
         except Exception as e:
             logger.error(f"Setup hook error: {e}")
-        
 
-        
     async def on_ready(self):
         """Called when bot is ready"""
         logger.info(f"Bot logged in as {self.user}")
@@ -104,7 +115,11 @@ class GZCTFNotificationBot(commands.Bot):
         logger.info(f"Events enabled: {self.enable_events}")
         logger.info(f"Events disabled due to auth: {self.events_disabled_due_to_auth}")
 
-        guild = self.get_guild(self.discord_config.guild_id) if self.discord_config.guild_id else None
+        guild = (
+            self.get_guild(self.discord_config.guild_id)
+            if self.discord_config.guild_id
+            else None
+        )
         if not guild:
             logger.error("Guild not found or GUILD_ID not set.")
             return
@@ -117,28 +132,46 @@ class GZCTFNotificationBot(commands.Bot):
 
         # Create or get notification channel only if notices are enabled
         if self.enable_notices:
-            notification_channel = await self._ensure_notification_channel(guild, notification_channel_name)
+            notification_channel = await self._ensure_notification_channel(
+                guild, notification_channel_name
+            )
             if notification_channel:
                 self.notification_channel_id = notification_channel.id
-                logger.info(f"Using notification channel: {notification_channel.name} (ID: {notification_channel.id})")
+                logger.info(
+                    f"Using notification channel: {notification_channel.name} (ID: {notification_channel.id})"
+                )
             else:
-                logger.warning("Notification channel not found and could not be created. Notices will not be sent.")
+                logger.warning(
+                    "Notification channel not found and could not be created. Notices will not be sent."
+                )
         else:
-            logger.info("Notices are disabled in configuration. Notification channel will not be created.")
+            logger.info(
+                "Notices are disabled in configuration. Notification channel will not be created."
+            )
 
         # Create or get event channel only if events are enabled
         if self.enable_events and not self.events_disabled_due_to_auth:
-            event_channel = await self._ensure_event_channel(guild, event_channel_name)
+            event_channel = await self._ensure_event_channel(
+                guild, event_channel_name
+            )
             if event_channel:
                 self.event_channel_id = event_channel.id
-                logger.info(f"Using event channel: {event_channel.name} (ID: {event_channel.id})")
+                logger.info(
+                    f"Using event channel: {event_channel.name} (ID: {event_channel.id})"
+                )
             else:
-                logger.warning("Event channel not found and could not be created. Events will not be sent.")
+                logger.warning(
+                    "Event channel not found and could not be created. Events will not be sent."
+                )
         else:
             if self.events_disabled_due_to_auth:
-                logger.info("Events are disabled due to authentication issues. Event channel will not be created.")
+                logger.info(
+                    "Events are disabled due to authentication issues. Event channel will not be created."
+                )
             else:
-                logger.info("Events are disabled in configuration. Event channel will not be created.")
+                logger.info(
+                    "Events are disabled in configuration. Event channel will not be created."
+                )
 
         # Initialize auth timing to avoid immediate first-loop re-auth
         self._last_auth_time = datetime.now().timestamp()
@@ -171,7 +204,9 @@ class GZCTFNotificationBot(commands.Bot):
         event_channel_name = os.getenv("EVENT_CHANNEL_NAME", "event")
         return notification_channel_name, event_channel_name
 
-    def _check_guild_permissions_and_maybe_disable_events(self, guild: discord.Guild) -> None:
+    def _check_guild_permissions_and_maybe_disable_events(
+        self, guild: discord.Guild
+    ) -> None:
         """Log essential permissions and disable events early if impossible to manage channels."""
         bot_member = guild.me
         if not bot_member:
@@ -180,22 +215,30 @@ class GZCTFNotificationBot(commands.Bot):
         gp = bot_member.guild_permissions
         logger.info("Checking essential guild permissions before setup...")
         required = {
-            'view_channel': gp.view_channel,
-            'send_messages': gp.send_messages,
-            'embed_links': gp.embed_links,
-            'read_message_history': gp.read_message_history,
+            "view_channel": gp.view_channel,
+            "send_messages": gp.send_messages,
+            "embed_links": gp.embed_links,
+            "read_message_history": gp.read_message_history,
         }
         for name, ok in required.items():
             logger.info(f"  {'✅' if ok else '❌'} {name}")
         if self.enable_events:
-            logger.info(f"  {'✅' if gp.manage_channels else '❌'} manage_channels (needed to auto-create private event channel)")
-            existing_event = discord.utils.get(guild.text_channels, name=os.getenv("EVENT_CHANNEL_NAME", "event"))
+            logger.info(
+                f"  {'✅' if gp.manage_channels else '❌'} manage_channels (needed to auto-create private event channel)"
+            )
+            existing_event = discord.utils.get(
+                guild.text_channels, name=os.getenv("EVENT_CHANNEL_NAME", "event")
+            )
             if not gp.manage_channels and not existing_event:
-                logger.warning("Events enabled but missing Manage Channels and event channel does not exist; disabling events")
+                logger.warning(
+                    "Events enabled but missing Manage Channels and event channel does not exist; disabling events"
+                )
                 self.events_disabled_due_to_auth = True
                 self.save_state()
 
-    def _get_bot_member_and_role(self, guild: discord.Guild) -> Tuple[Optional[discord.Member], Optional[discord.Role]]:
+    def _get_bot_member_and_role(
+        self, guild: discord.Guild
+    ) -> Tuple[Optional[discord.Member], Optional[discord.Role]]:
         """Return the bot's guild member and its highest role (excluding @everyone), if any."""
         bot_member = guild.me
         bot_role = None
@@ -205,9 +248,15 @@ class GZCTFNotificationBot(commands.Bot):
                 bot_role = max(non_everyone_roles, key=lambda r: r.position)
         return bot_member, bot_role
 
-    def _build_event_overwrites(self, guild: discord.Guild, allowed_roles: List[discord.Role]) -> Dict[Union[discord.Role, discord.Member, discord.Object], discord.PermissionOverwrite]:
+    def _build_event_overwrites(
+        self, guild: discord.Guild, allowed_roles: List[discord.Role]
+    ) -> Dict[
+        Union[discord.Role, discord.Member, discord.Object], discord.PermissionOverwrite
+    ]:
         """Build permission overwrites for the private event channel."""
-        overwrites: Dict[Union[discord.Role, discord.Member, discord.Object], discord.PermissionOverwrite] = {}
+        overwrites: Dict[
+            Union[discord.Role, discord.Member, discord.Object], discord.PermissionOverwrite
+        ] = {}
         overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
         bot_member, bot_role = self._get_bot_member_and_role(guild)
         if bot_member:
@@ -215,25 +264,27 @@ class GZCTFNotificationBot(commands.Bot):
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
-                read_message_history=True
+                read_message_history=True,
             )
         if bot_role:
             overwrites[bot_role] = discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
-                read_message_history=True
+                read_message_history=True,
             )
         for role in allowed_roles:
             overwrites[role] = discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
-                read_message_history=True
+                read_message_history=True,
             )
         return overwrites
 
-    async def _apply_event_channel_overwrites(self, channel: discord.TextChannel, guild: discord.Guild, allowed_roles: List[discord.Role]) -> None:
+    async def _apply_event_channel_overwrites(
+        self, channel: discord.TextChannel, guild: discord.Guild, allowed_roles: List[discord.Role]
+    ) -> None:
         """Apply privacy and access overwrites to the event channel."""
         bot_member, bot_role = self._get_bot_member_and_role(guild)
         await channel.set_permissions(guild.default_role, view_channel=False)
@@ -243,7 +294,7 @@ class GZCTFNotificationBot(commands.Bot):
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
-                read_message_history=True
+                read_message_history=True,
             )
         if bot_role:
             await channel.set_permissions(
@@ -251,7 +302,7 @@ class GZCTFNotificationBot(commands.Bot):
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
-                read_message_history=True
+                read_message_history=True,
             )
         for role in allowed_roles:
             await channel.set_permissions(
@@ -259,16 +310,18 @@ class GZCTFNotificationBot(commands.Bot):
                 view_channel=True,
                 send_messages=True,
                 embed_links=True,
-                read_message_history=True
+                read_message_history=True,
             )
 
-    async def _ensure_notification_channel(self, guild: discord.Guild, name: str) -> Optional[discord.TextChannel]:
+    async def _ensure_notification_channel(
+        self, guild: discord.Guild, name: str
+    ) -> Optional[discord.TextChannel]:
         """Create or fetch the notification channel if notices are enabled."""
         channel = discord.utils.get(guild.text_channels, name=name)
         if channel:
             return channel
         try:
-            channel = await guild.create_text_channel(name)
+            channel = await guild.create_text_channel(name, news=True)
             logger.info(f"Created notification channel: {channel.name}")
             return channel
         except discord.Forbidden:
@@ -283,7 +336,7 @@ class GZCTFNotificationBot(commands.Bot):
         allowed_role_names_env = os.getenv("EVENT_ALLOWED_ROLE_NAMES", "").strip()
         allowed_role_ids: set[int] = set()
         if allowed_role_ids_env:
-            for part in allowed_role_ids_env.split(','):
+            for part in allowed_role_ids_env.split(","):
                 part = part.strip()
                 if part.isdigit():
                     try:
@@ -296,7 +349,9 @@ class GZCTFNotificationBot(commands.Bot):
             if role:
                 allowed_roles.append(role)
         if allowed_role_names_env:
-            for name in [n.strip() for n in allowed_role_names_env.split(',') if n.strip()]:
+            for name in [
+                n.strip() for n in allowed_role_names_env.split(",") if n.strip()
+            ]:
                 role_by_name = discord.utils.get(guild.roles, name=name)
                 if role_by_name and role_by_name not in allowed_roles:
                     allowed_roles.append(role_by_name)
@@ -304,7 +359,9 @@ class GZCTFNotificationBot(commands.Bot):
             allowed_roles = [r for r in guild.roles if r.permissions.administrator]
         return allowed_roles
 
-    async def _ensure_event_channel(self, guild: discord.Guild, name: str) -> Optional[discord.TextChannel]:
+    async def _ensure_event_channel(
+        self, guild: discord.Guild, name: str
+    ) -> Optional[discord.TextChannel]:
         """Create or harden a private event channel with correct overwrites; return the channel or None."""
         channel = discord.utils.get(guild.text_channels, name=name)
         allowed_roles = self._get_allowed_roles_for_event(guild)
@@ -313,17 +370,23 @@ class GZCTFNotificationBot(commands.Bot):
 
         if not channel:
             try:
-                channel = await guild.create_text_channel(name, overwrites=overwrites)
+                channel = await guild.create_text_channel(
+                    name, news=True, overwrites=overwrites
+                )
                 logger.info(f"Created event channel: {channel.name}")
             except discord.Forbidden:
-                logger.error("Missing permissions to create event channel - events will be disabled")
+                logger.error(
+                    "Missing permissions to create event channel - events will be disabled"
+                )
                 return None
             except Exception as e:
                 logger.error(f"Failed to create event channel: {e}")
                 return None
         else:
             try:
-                await self._apply_event_channel_overwrites(channel, guild, allowed_roles)
+                await self._apply_event_channel_overwrites(
+                    channel, guild, allowed_roles
+                )
                 logger.info("Ensured event channel is private with correct permissions")
             except discord.Forbidden:
                 logger.error("Missing permissions to update event channel overwrites")
@@ -337,15 +400,29 @@ class GZCTFNotificationBot(commands.Bot):
             bot_member, bot_role = self._get_bot_member_and_role(guild)
             perms = channel.permissions_for(bot_member) if bot_member else None
             if not (perms and perms.view_channel):
-                logger.warning("Bot does not have access to the event channel yet; attempting to grant access again")
+                logger.warning(
+                    "Bot does not have access to the event channel yet; attempting to grant access again"
+                )
                 if bot_member:
-                    await channel.set_permissions(bot_member, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
+                    await channel.set_permissions(
+                        bot_member,
+                        view_channel=True,
+                        send_messages=True,
+                        embed_links=True,
+                        read_message_history=True,
+                    )
                 if bot_role:
-                    await channel.set_permissions(bot_role, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
+                    await channel.set_permissions(
+                        bot_role,
+                        view_channel=True,
+                        send_messages=True,
+                        embed_links=True,
+                        read_message_history=True,
+                    )
         except Exception:
             pass
         return channel
-    
+
     @tasks.loop(seconds=30)
     async def poll_notifications(self):
         """Poll for new notifications from GZCTF"""
@@ -354,57 +431,72 @@ class GZCTFNotificationBot(commands.Bot):
             auth_check_interval = self.AUTH_CHECK_INTERVAL
             auth_time_interval = self.AUTH_TIME_INTERVAL
             current_time = datetime.now().timestamp()
-            
+
             # Create static variables if they don't exist
-            if not hasattr(self, '_last_auth_time'):
+            if not hasattr(self, "_last_auth_time"):
                 self._last_auth_time = current_time
                 self._poll_count = 0
-                
+
             self._poll_count += 1
             time_since_last_auth = current_time - self._last_auth_time
-            
+
             # Re-authenticate if poll count reached, time interval reached, or token is no longer valid
             token_ok = await self.gzctf_client.is_authenticated()
             need_reauth = (
-                self._poll_count >= auth_check_interval or 
-                time_since_last_auth >= auth_time_interval or 
-                not token_ok
+                self._poll_count >= auth_check_interval
+                or time_since_last_auth >= auth_time_interval
+                or not token_ok
             )
             if need_reauth:
-                
+
                 reason = "poll count reached"
                 if time_since_last_auth >= auth_time_interval:
                     reason = "time interval reached"
                 elif not token_ok:
                     reason = "token validation failed"
-                
-                logger.info(f"Performing scheduled re-authentication ({reason}, poll count: {self._poll_count})")
-                
+
+                logger.info(
+                    f"Performing scheduled re-authentication ({reason}, poll count: {self._poll_count})"
+                )
+
                 if not await self.gzctf_client.authenticate():
                     logger.error("Failed to re-authenticate, skipping this poll cycle")
                     return
                 logger.info("Successfully re-authenticated")
                 self._last_auth_time = current_time
                 self._poll_count = 0
-            
+
             # Get new notices if enabled and game_id is set
             if self.enable_notices and self.game_id is not None:
-                notices = await self.gzctf_client.get_game_notices(self.game_id, count=10)
+                notices = await self.gzctf_client.get_game_notices(
+                    self.game_id, count=10
+                )
                 if notices:
                     await self.process_notices(notices)
             elif self.enable_notices:
                 logger.warning("Notices enabled but game_id is not set")
-            
+
             # Get new events if enabled and event channel exists and game_id is set
             events = None
-            if self.enable_events and self.event_channel_id and not self.events_disabled_due_to_auth and self.game_id is not None:
+            if (
+                self.enable_events
+                and self.event_channel_id
+                and not self.events_disabled_due_to_auth
+                and self.game_id is not None
+            ):
                 logger.debug(f"Fetching events for game {self.game_id}...")
-                events = await self.gzctf_client.get_game_events(self.game_id, count=10)
-                logger.debug(f"Events result: {len(events) if events else 'None/Error'}")
-                
+                events = await self.gzctf_client.get_game_events(
+                    self.game_id, count=10
+                )
+                logger.debug(
+                    f"Events result: {len(events) if events else 'None/Error'}"
+                )
+
                 # If server has denied events with 403, disable events immediately
-                if getattr(self.gzctf_client, 'events_forbidden', False):
-                    logger.warning("Events endpoint is forbidden (403). Disabling events for this run.")
+                if getattr(self.gzctf_client, "events_forbidden", False):
+                    logger.warning(
+                        "Events endpoint is forbidden (403). Disabling events for this run."
+                    )
                     self.events_disabled_due_to_auth = True
                     self.save_state()
                 elif events:
@@ -419,52 +511,62 @@ class GZCTFNotificationBot(commands.Bot):
                 else:
                     # If events is None, it means there was an error (likely 401)
                     self.events_failure_count += 1
-                    logger.warning(f"Events endpoint failed (attempt {self.events_failure_count}/5)")
-            elif self.enable_events and not self.events_disabled_due_to_auth and self.game_id is None:
+                    logger.warning(
+                        f"Events endpoint failed (attempt {self.events_failure_count}/5)"
+                    )
+            elif (
+                self.enable_events
+                and not self.events_disabled_due_to_auth
+                and self.game_id is None
+            ):
                 logger.warning("Events enabled but game_id is not set")
-                    
+
             # Check if we need to disable events due to repeated failures
             if self.events_failure_count >= 5:
-                logger.warning("Events endpoint has failed 5 times, disabling events due to authentication issues")
+                logger.warning(
+                    "Events endpoint has failed 5 times, disabling events due to authentication issues"
+                )
                 self.events_disabled_due_to_auth = True
                 self.save_state()
             else:
                 # Skip events silently - no error logging needed
                 pass
-                
+
         except Exception as e:
             logger.error(f"Error polling notifications: {e}")
-    
+
     @poll_notifications.before_loop
     async def before_poll_notifications(self):
         """Wait until bot is ready before starting polling"""
         await self.wait_until_ready()
-    
+
     @tasks.loop(minutes=30)
     async def update_game_info(self):
         """Update game info and bot status every 30 minutes"""
         await self.fetch_and_update_status()
-    
+
     @update_game_info.before_loop
     async def before_update_game_info(self):
         """Wait until bot is ready before starting game info updates"""
         await self.wait_until_ready()
-    
+
     async def fetch_and_update_status(self):
         """Fetch game info and update bot status"""
         try:
             # Check if we're authenticated
             if not await self.gzctf_client.is_authenticated():
-                logger.warning("Not authenticated, attempting to authenticate for game info...")
+                logger.warning(
+                    "Not authenticated, attempting to authenticate for game info..."
+                )
                 if not await self.gzctf_client.authenticate():
                     logger.error("Failed to authenticate for game info")
                     return
-            
+
             # Fetch game info if game_id is set
             if self.game_id is not None:
                 game_info = await self.gzctf_client.get_game_info(self.game_id)
                 if game_info:
-                    self.game_title = game_info.get('title', f'Game {self.game_id}')
+                    self.game_title = game_info.get("title", f"Game {self.game_id}")
                     self.last_game_info_fetch = datetime.now()
                     logger.info(f"Updated game title: {self.game_title}")
                     # Save state when we successfully update game title
@@ -476,33 +578,36 @@ class GZCTFNotificationBot(commands.Bot):
             else:
                 logger.warning("Game ID not set, cannot fetch game info")
                 self.game_title = "No Game ID Set"
-            
+
             # Update bot status
             await self.update_bot_status()
-            
+
         except Exception as e:
             logger.error(f"Error updating game info: {e}")
             if not self.game_title:
                 self.game_title = f"Game {self.game_id}"
             await self.update_bot_status()
-    
+
     async def update_bot_status(self):
         """Update bot status with current game title"""
         try:
             status_text = self.game_title or f"Game {self.game_id}"
-            
+
             # Add status indicators
-            if not self.enable_events or not self.event_channel_id or self.events_disabled_due_to_auth:
+            if (
+                not self.enable_events
+                or not self.event_channel_id
+                or self.events_disabled_due_to_auth
+            ):
                 status_text += " (Notices Only)"
-            
+
             await self.change_presence(
                 activity=discord.Activity(
-                    type=discord.ActivityType.watching, 
-                    name=status_text
+                    type=discord.ActivityType.watching, name=status_text
                 )
             )
             logger.debug(f"Updated bot status: {status_text}")
-            
+
         except Exception as e:
             logger.error(f"Error updating bot status: {e}")
 
@@ -510,168 +615,209 @@ class GZCTFNotificationBot(commands.Bot):
         """Send a one-time 'Bot Online' embed to notification and event channels if enabled."""
         title = "🤖 Bot Online"
         desc = f"Monitoring {self.game_title or f'Game {self.game_id}'}"
-        embed = discord.Embed(title=title, description=desc, color=0x00CC66, timestamp=datetime.now())
+        embed = discord.Embed(
+            title=title, description=desc, color=0x00CC66, timestamp=datetime.now()
+        )
 
         # Notice channel
         if self.enable_notices and self.notification_channel_id:
             try:
                 channel = self.get_channel(self.notification_channel_id)
-                if channel and hasattr(channel, 'send'):
+                if channel and hasattr(channel, "send"):
                     await cast(discord.TextChannel, channel).send(embed=embed)
                     logger.info("Sent 'Bot Online' message to notification channel")
             except Exception as e:
-                logger.warning(f"Could not send 'Bot Online' to notification channel: {e}")
+                logger.warning(
+                    f"Could not send 'Bot Online' to notification channel: {e}"
+                )
 
         # Event channel
-        if self.enable_events and not self.events_disabled_due_to_auth and self.event_channel_id:
+        if (
+            self.enable_events
+            and not self.events_disabled_due_to_auth
+            and self.event_channel_id
+        ):
             try:
                 channel = self.get_channel(self.event_channel_id)
-                if channel and hasattr(channel, 'send'):
+                if channel and hasattr(channel, "send"):
                     await cast(discord.TextChannel, channel).send(embed=embed)
                     logger.info("Sent 'Bot Online' message to event channel")
             except Exception as e:
                 logger.warning(f"Could not send 'Bot Online' to event channel: {e}")
-    
+
     async def process_notices(self, notices: List[Dict[str, Any]]):
         """Process and send new notices to Discord"""
         if not notices:
             return
-            
+
         # Sort by ID to ensure we process in order
-        notices.sort(key=lambda x: x.get('id', 0))
-        
+        notices.sort(key=lambda x: x.get("id", 0))
+
         for notice in notices:
-            notice_id = notice.get('id')
-            notice_type = notice.get('type', 'Normal')
-            values = notice.get('values', [])
-            time = notice.get('time', 0)
-            
+            notice_id = notice.get("id")
+            notice_type = notice.get("type", "Normal")
+            values = notice.get("values", [])
+            time = notice.get("time", 0)
+
             # Skip if we've already seen this notice
             if self.last_notice_id and notice_id <= self.last_notice_id:
                 continue
-                
+
             # Update last seen ID if notice_id is not None
-            if notice_id is not None and (not self.last_notice_id or notice_id > self.last_notice_id):
+            if notice_id is not None and (
+                not self.last_notice_id or notice_id > self.last_notice_id
+            ):
                 self.last_notice_id = notice_id
                 # Save state after updating
                 self.save_state()
-            
+
             # Format and send notice
             embed = self.formatter.format_notice(notice)
             if embed:
-                await self.send_notification(embed, 'notice', notice_type, values, notice_id, time)
-    
+                await self.send_notification(
+                    embed, "notice", notice_type, values, notice_id, time
+                )
+
     async def process_events(self, events: List[Dict[str, Any]]):
         """Process and send new events to Discord"""
         if not events:
             logger.debug("No events to process")
             return
-            
+
         # Skip if no event channel (this should not happen as we check before calling this method)
         if not self.event_channel_id:
             return
-            
-        logger.debug(f"Processing {len(events)} events, last_event_time: {self.last_event_time}")
-        
+
+        logger.debug(
+            f"Processing {len(events)} events, last_event_time: {self.last_event_time}"
+        )
+
         # Sort by time to ensure we process in order
-        events.sort(key=lambda x: x.get('time', 0))
-        
+        events.sort(key=lambda x: x.get("time", 0))
+
         new_events_count = 0
         for event in events:
-            event_time = event.get('time', 0)
-            event_type = event.get('type', 'Normal')
-            values = event.get('values', [])
-            user = event.get('user', 'Unknown')
-            team = event.get('team', 'Unknown')
-            
-            logger.debug(f"Event: {event_type} at {event_time}, last_seen: {self.last_event_time}")
-            
+            event_time = event.get("time", 0)
+            event_type = event.get("type", "Normal")
+            values = event.get("values", [])
+            user = event.get("user", "Unknown")
+            team = event.get("team", "Unknown")
+
+            logger.debug(
+                f"Event: {event_type} at {event_time}, last_seen: {self.last_event_time}"
+            )
+
             # Skip if we've already seen this event
             if self.last_event_time and event_time <= self.last_event_time:
-                logger.debug(f"Skipping old event: {event_time} <= {self.last_event_time}")
+                logger.debug(
+                    f"Skipping old event: {event_time} <= {self.last_event_time}"
+                )
                 continue
-                
+
             new_events_count += 1
             logger.debug(f"Processing new event: {event_type} by {user}")
-            
+
             # Update last seen time
             if not self.last_event_time or event_time > self.last_event_time:
                 self.last_event_time = event_time
                 # Save state after updating
                 self.save_state()
-            
+
             # Format and send event
             embed = self.formatter.format_event(event)
             if embed:
-                await self.send_notification(embed, 'event', event_type, values, None, event_time, user, team)
-        
-        logger.debug(f"Processed {new_events_count} new events out of {len(events)} total")
-    
-    async def send_notification(self, embed: discord.Embed, notification_type: str = 'unknown', 
-                              content_type: str = 'Normal', values: Optional[List[str]] = None, 
-                              notification_id: Optional[int] = None, timestamp: Optional[int] = None,
-                              user: Optional[str] = None, team: Optional[str] = None):
+                await self.send_notification(
+                    embed, "event", event_type, values, None, event_time, user, team
+                )
+
+        logger.debug(
+            f"Processed {new_events_count} new events out of {len(events)} total"
+        )
+
+    async def send_notification(
+        self,
+        embed: discord.Embed,
+        notification_type: str = "unknown",
+        content_type: str = "Normal",
+        values: Optional[List[str]] = None,
+        notification_id: Optional[int] = None,
+        timestamp: Optional[int] = None,
+        user: Optional[str] = None,
+        team: Optional[str] = None,
+    ):
         """Send notification embed to correct Discord channel with detailed logging"""
         try:
-            if notification_type == 'notice':
+            if notification_type == "notice":
                 if not self.notification_channel_id:
-                    logger.error("Notification channel ID not set. Channel may not have been created.")
+                    logger.error(
+                        "Notification channel ID not set. Channel may not have been created."
+                    )
                     return
                 channel_id = self.notification_channel_id
                 channel_type_desc = "notification"
-            elif notification_type == 'event':
+            elif notification_type == "event":
                 # Event channel check is now done in process_events before calling this method
                 if not self.event_channel_id:
-                    logger.error("Event channel ID not set. Channel may not have been created.")
+                    logger.error(
+                        "Event channel ID not set. Channel may not have been created."
+                    )
                     return
                 channel_id = self.event_channel_id
                 channel_type_desc = "event"
             else:
-                logger.error(f"Unknown notification type '{notification_type}', cannot send message.")
+                logger.error(
+                    f"Unknown notification type '{notification_type}', cannot send message."
+                )
                 return
-            
+
             channel = self.get_channel(channel_id)
-            if channel and hasattr(channel, 'send'):
+            if channel and hasattr(channel, "send"):
                 # Cast to the correct type that has send method
                 text_channel = cast(discord.TextChannel, channel)
                 await text_channel.send(embed=embed)
-                
+
                 # Create detailed log message
                 log_parts = []
-                log_parts.append(f"Sent {notification_type} to {channel_type_desc} channel: {embed.title}")
-                
+                log_parts.append(
+                    f"Sent {notification_type} to {channel_type_desc} channel: {embed.title}"
+                )
+
                 # Add content type
                 log_parts.append(f"Type: {content_type}")
-                
+
                 # Add values if available
                 if values:
                     log_parts.append(f"Values: {values}")
-                
+
                 # Add user/team for events
-                if notification_type == 'event':
-                    if user and user != 'Unknown':
+                if notification_type == "event":
+                    if user and user != "Unknown":
                         log_parts.append(f"User: {user}")
-                    if team and team != 'Unknown':
+                    if team and team != "Unknown":
                         log_parts.append(f"Team: {team}")
-                
+
                 # Add ID if available
                 if notification_id:
                     log_parts.append(f"ID: {notification_id}")
-                
+
                 # Add timestamp if available
                 if timestamp:
                     try:
-                        dt = datetime.fromtimestamp(timestamp / 1000 if timestamp > 1e10 else timestamp)
+                        dt = datetime.fromtimestamp(
+                            timestamp / 1000 if timestamp > 1e10 else timestamp
+                        )
                         log_parts.append(f"Time: {dt.strftime('%Y-%m-%d %H:%M:%S')}")
-                    except:
+                    except Exception:
                         pass
-                
+
                 # Log the detailed message
                 logger.info(" | ".join(log_parts))
-                
+
             else:
-                logger.error(f"Could not find target channel for type '{notification_type}'")
-                
+                logger.error(
+                    f"Could not find target channel for type '{notification_type}'"
+                )
+
         except Exception as e:
             logger.error(f"Error sending notification: {e}")
 
@@ -679,14 +825,18 @@ class GZCTFNotificationBot(commands.Bot):
         """Load bot state from file"""
         try:
             if os.path.exists(self.state_file):
-                with open(self.state_file, 'r') as f:
+                with open(self.state_file, "r") as f:
                     state = json.load(f)
-                    self.last_notice_id = state.get('last_notice_id')
-                    self.last_event_time = state.get('last_event_time')
-                    self.events_failure_count = state.get('events_failure_count', 0)
-                    self.events_disabled_due_to_auth = state.get('events_disabled_due_to_auth', False)
-                    self.game_title = state.get('game_title')
-                    logger.info(f"Loaded state: last_notice_id={self.last_notice_id}, last_event_time={self.last_event_time}, events_disabled={self.events_disabled_due_to_auth}, game_title={self.game_title}")
+                    self.last_notice_id = state.get("last_notice_id")
+                    self.last_event_time = state.get("last_event_time")
+                    self.events_failure_count = state.get("events_failure_count", 0)
+                    self.events_disabled_due_to_auth = state.get(
+                        "events_disabled_due_to_auth", False
+                    )
+                    self.game_title = state.get("game_title")
+                    logger.info(
+                        f"Loaded state: last_notice_id={self.last_notice_id}, last_event_time={self.last_event_time}, events_disabled={self.events_disabled_due_to_auth}, game_title={self.game_title}"
+                    )
             else:
                 logger.info("No previous state found, starting fresh")
         except Exception as e:
@@ -696,41 +846,43 @@ class GZCTFNotificationBot(commands.Bot):
             self.events_failure_count = 0
             self.events_disabled_due_to_auth = False
             self.game_title = None
-            
+
     def save_state(self):
         """Save bot state to file"""
         try:
             state = {
-                'last_notice_id': self.last_notice_id,
-                'last_event_time': self.last_event_time,
-                'events_failure_count': self.events_failure_count,
-                'events_disabled_due_to_auth': self.events_disabled_due_to_auth,
-                'game_id': self.game_id,
-                'game_title': self.game_title,
-                'timestamp': datetime.now().isoformat()
+                "last_notice_id": self.last_notice_id,
+                "last_event_time": self.last_event_time,
+                "events_failure_count": self.events_failure_count,
+                "events_disabled_due_to_auth": self.events_disabled_due_to_auth,
+                "game_id": self.game_id,
+                "game_title": self.game_title,
+                "timestamp": datetime.now().isoformat(),
             }
-            
+
             # Ensure directory exists and has proper permissions
             os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
-            
+
             # Try to write to a temporary file first, then rename
-            temp_file = self.state_file + '.tmp'
-            with open(temp_file, 'w') as f:
+            temp_file = self.state_file + ".tmp"
+            with open(temp_file, "w") as f:
                 json.dump(state, f, indent=2)
-            
+
             # Atomic rename
             os.rename(temp_file, self.state_file)
             logger.debug(f"State saved successfully to {self.state_file}")
-            
+
         except PermissionError as e:
-            logger.error(f"Permission denied saving state to {self.state_file}: {e}")
+            logger.error(
+                f"Permission denied saving state to {self.state_file}: {e}"
+            )
             logger.info("Bot will continue running but state won't be persisted")
         except Exception as e:
             logger.error(f"Error saving state: {e}")
             # Clean up temp file if it exists
-            temp_file = self.state_file + '.tmp'
+            temp_file = self.state_file + ".tmp"
             if os.path.exists(temp_file):
                 try:
                     os.remove(temp_file)
-                except:
-                    pass 
+                except Exception:
+                    pass
