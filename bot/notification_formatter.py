@@ -1,9 +1,7 @@
 import discord
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 import logging
-import random
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +39,7 @@ class NotificationFormatter:
         """Format a game notice into a Discord embed"""
         try:
             notice_type = notice.get('type', 'Normal')
-            values = notice.get('values', [])
+            values: List[str] = notice.get('values', [])
             notice_id = notice.get('id', 'Unknown')
             time = notice.get('time', 0)
             
@@ -68,7 +66,7 @@ class NotificationFormatter:
         """Format a game event into a Discord embed - Compact format"""
         try:
             event_type = event.get('type', 'Normal')
-            values = event.get('values', [])
+            values: List[str] = event.get('values', [])
             time = event.get('time', 0)
             user = event.get('user', 'Unknown')
             team = event.get('team', 'Unknown')
@@ -104,7 +102,7 @@ class NotificationFormatter:
         }
         return f"{emoji} {titles.get(notice_type, 'Notice')}".strip()
     
-    def _format_event_title(self, event_type: str, values: list = None, user: str = None, team: str = None) -> str:
+    def _format_event_title(self, event_type: str, values: Optional[List[str]] = None, user: Optional[str] = None, team: Optional[str] = None) -> str:
         """Format event type into a compact title with all essential info"""
         # Clean user and team info
         user_display = user if user and user != 'Unknown' else ""
@@ -151,7 +149,7 @@ class NotificationFormatter:
         }
         return titles.get(event_type, f"📝 {user_info} - Event").strip()
     
-    def _get_event_color(self, event_type: str, values: list = None) -> int:
+    def _get_event_color(self, event_type: str, values: Optional[List[str]] = None) -> int:
         """Get color for event based on type and values"""
         if event_type == "FlagSubmit" and values and len(values) >= 1:
             result = values[0]
@@ -217,14 +215,16 @@ class NotificationFormatter:
         
         return ""
     
-    def _timestamp_to_datetime(self, timestamp: int) -> datetime:
+    def _timestamp_to_datetime(self, timestamp: Optional[float | int]) -> datetime:
         """Convert Unix timestamp to datetime"""
         try:
             if isinstance(timestamp, (int, float)):
                 # Check if timestamp is in seconds or milliseconds
                 if timestamp > 1e10:  # Likely milliseconds
-                    timestamp = timestamp / 1000
-                return datetime.fromtimestamp(timestamp)
+                    ts = int(timestamp // 1000)
+                else:
+                    ts = int(timestamp)
+                return datetime.fromtimestamp(ts)
             else:
                 return datetime.now()
         except (ValueError, TypeError, OSError):
