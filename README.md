@@ -1,6 +1,6 @@
 # GZCTF Discord Notification Bot
 
-A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events, then pushes them to a Discord channel in real-time.
+A Discord bot that monitors GZCTF platform for notifications and events, then pushes them to a Discord channel in real-time.
 
 ## Features
 
@@ -42,7 +42,7 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
 
 - Python 3.8 or higher
 - Discord Bot Token
-- GZCTF platform access (API token or username/password)
+- GZCTF platform access (username/password)
 
 ### Setup
 
@@ -77,7 +77,7 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
    - The bot will auto-create (or use) two channels:
      - **Notification channel** (public): For general notices like First Blood, New Challenges
      - **Event channel** (private): For sensitive data like flag submissions, user activities
-   - You can customize these names via environment variables (see below).
+   - You can customize these names via environment variables.
 
 5. **Configure Environment**
    ```bash
@@ -87,14 +87,13 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
    Edit `.env` with your configuration:
    ```env
    # GZCTF Configuration
-   GZCTF_BASE_URL=http://your-gzctf-instance.com
+   GZCTF_BASE_URL=https://your-gzctf-instance.com
    GZCTF_USERNAME=your_username
    GZCTF_PASSWORD=your_password
 
    # Discord Bot Configuration
    DISCORD_TOKEN=your_discord_bot_token_here
-   DISCORD_CHANNEL_ID=1234567890123456789
-   DISCORD_GUILD_ID=1234567890123456789
+   DISCORD_GUILD_ID=your_discord_server_id
    # Optional: Custom channel names (default: notification, event)
    NOTIFICATION_CHANNEL_NAME=notification
    EVENT_CHANNEL_NAME=event
@@ -104,6 +103,9 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
    POLL_INTERVAL=30
    ENABLE_NOTICES=true
    ENABLE_EVENTS=true
+   DEBUG=false
+   STATE_DIR=/app/data
+   TZ=Asia/Ho_Chi_Minh
    ```
 
 ## Configuration
@@ -116,16 +118,16 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
 | `GZCTF_USERNAME` | Username for authentication | Yes | - |
 | `GZCTF_PASSWORD` | Password for authentication | Yes | - |
 | `DISCORD_TOKEN` | Discord bot token | Yes | - |
-| `DISCORD_CHANNEL_ID` | Discord channel ID for notifications | Yes* | - |
 | `DISCORD_GUILD_ID` | Discord guild ID (server) | Yes | - |
-| `NOTIFICATION_CHANNEL_NAME` | Name of the public notification channel (auto-created if missing) | No | `notification` |
-| `EVENT_CHANNEL_NAME` | Name of the private event channel (auto-created if missing) | No | `event` |
+| `NOTIFICATION_CHANNEL_NAME` | Name of the public notification channel | No | `notification` |
+| `EVENT_CHANNEL_NAME` | Name of the private event channel | No | `event` |
 | `GAME_ID` | GZCTF game ID to monitor | Yes | - |
 | `POLL_INTERVAL` | Polling interval in seconds | No | `30` |
 | `ENABLE_NOTICES` | Enable game notices | No | `true` |
 | `ENABLE_EVENTS` | Enable game events | No | `true` |
 | `DEBUG` | Enable debug logging | No | `false` |
-*If you use auto-created channels, you can leave `DISCORD_CHANNEL_ID` empty or set it as a fallback.
+| `STATE_DIR` | Directory for state storage | No | `/app/data` |
+| `TZ` | Timezone | No | `UTC` |
 
 ### Finding Discord Channel ID
 
@@ -143,8 +145,16 @@ A Discord bot that monitors GZCTF (GZCTF) platform for notifications and events,
 
 ### Running the Bot
 
+#### Using Python directly
+
 ```bash
-python main.py
+python bot/main.py
+```
+
+#### Using Docker (recommended)
+
+```bash
+docker-compose up -d
 ```
 
 The bot will:
@@ -164,20 +174,10 @@ The bot automatically creates a private event channel that only administrators a
 - Container start/stop events
 - Cheat detection alerts
 
-#### Commands for Managing Event Channel Access:
-
-```bash
-!setup_event_channel          # Setup or fix event channel permissions (Admin only)
-!add_event_access @user       # Grant a user read access to event channel (Admin only)
-!remove_event_access @user    # Revoke a user's access to event channel (Admin only)
-!list_event_access            # List users with event channel access (Admin only)
-```
-
 #### Default Permissions:
 - **@everyone**: No access (cannot see the channel)
 - **Bot**: Full access (can send messages and embeds)
 - **Admin/Moderator roles**: Full access (automatically detected)
-- **Manually added users**: Read-only access
 
 ### Debugging
 
@@ -186,22 +186,22 @@ If you encounter issues, you can:
 1. **Enable debug mode** by setting `DEBUG=true` in your `.env` file
 2. **Test API connectivity** using the debug script:
    ```bash
-   python debug_api.py
+   python scripts/debug_api.py
    ```
 3. **Test configuration** using the test script:
    ```bash
-   python test_config.py
+   python scripts/test_config.py
    ```
 4. **Check Discord permissions** using the permission checker:
    ```bash
-   python check_discord_permissions.py
+   python scripts/check_discord_permissions.py
    ```
 
 ## Example Notifications
 
 ### First Blood Notification
 ```
-🥇 First Blood! 🩸
+🥇 First Blood!
 **Web Challenge** has been solved by **Team Alpha**!
 Notice ID: 123
 ```
@@ -227,7 +227,7 @@ Team: Team Beta
 
 1. **Authentication Failed**
    - Check your GZCTF credentials
-   - Ensure the API token is valid or username/password are correct
+   - Ensure username/password are correct
    - Verify the GZCTF base URL is accessible
 
 2. **Discord Bot Permission Errors (403 Forbidden)**
@@ -236,7 +236,7 @@ Team: Team Beta
      - **Send Messages**
      - **Embed Links**
      - **Use External Emojis**
-   - Verify the `DISCORD_CHANNEL_ID` is correct
+   - Verify `DISCORD_GUILD_ID` is correct
    - Make sure the bot can see and access the specified channel
    - Check channel permissions - the bot role must have permission to send messages
 
@@ -267,20 +267,42 @@ The bot creates a log file `gzctf_bot.log` with detailed information about:
 - Discord message sending
 - Errors and exceptions
 
-## Development
+## System Architecture
 
-### Project Structure
+The bot is organized with a clear modular structure:
+
+1. **config.py**: Manages configuration from environment variables
+2. **gzctf_client.py**: API client for communicating with GZCTF
+3. **notification_formatter.py**: Formats notifications into Discord embeds
+4. **discord_bot.py**: Handles Discord connection and sending notifications
+5. **main.py**: Entry point of the application
+
+## Docker Deployment
+
+The project is designed for easy deployment with Docker:
+
+1. **Dockerfile**: Builds image from Python 3.11-slim
+2. **docker-compose.yml**: Defines service with volumes for persistent data
+3. **Volumes**: Stores bot state and logs
+4. **Security**: Runs container as non-root user
+
+## Project Structure
 
 ```
 gzctf-notification/
-├── main.py                 # Main entry point
-├── config.py              # Configuration management
-├── gzctf_client.py        # GZCTF API client
-├── discord_bot.py         # Discord bot implementation
-├── notification_formatter.py # Notification formatting
-├── requirements.txt       # Python dependencies
-├── env.example           # Example environment file
-└── README.md             # This file
+├── bot/
+│   ├── __init__.py
+│   ├── config.py              # Configuration management
+│   ├── discord_bot.py         # Discord bot implementation
+│   ├── gzctf_client.py        # GZCTF API client
+│   ├── main.py                # Main entry point
+│   └── notification_formatter.py # Notification formatting
+├── scripts/                   # Utility scripts
+├── docker-compose.yml         # Docker Compose configuration
+├── Dockerfile                 # Docker configuration
+├── env.example                # Example environment file
+├── requirements.txt           # Python dependencies
+└── README.md                  # This documentation
 ```
 
 ### Adding New Notification Types
@@ -288,14 +310,6 @@ gzctf-notification/
 1. Update the `NotificationFormatter` class in `notification_formatter.py`
 2. Add new colors and emojis to the mapping dictionaries
 3. Implement formatting logic in the appropriate methods
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
 
 ## License
 
@@ -312,4 +326,4 @@ For issues and questions:
 
 - GZCTF platform for providing the API
 - Discord.py library for Discord integration
-- Python community for excellent async libraries 
+- Python community for excellent async libraries
