@@ -106,7 +106,7 @@ A Discord bot that monitors GZCTF platform for notifications and events, then pu
    ENABLE_NOTICES=true
    ENABLE_EVENTS=true
    DEBUG=false
-   STATE_DIR=/app/data
+   STATE_DIR=/app
    TZ=Asia/Ho_Chi_Minh
    ```
 
@@ -128,7 +128,7 @@ A Discord bot that monitors GZCTF platform for notifications and events, then pu
 | `ENABLE_NOTICES` | Enable game notices | No | `true` |
 | `ENABLE_EVENTS` | Enable game events | No | `true` |
 | `DEBUG` | Enable debug logging | No | `false` |
-| `STATE_DIR` | Directory for state storage | No | `/app/data` |
+| `STATE_DIR` | Directory for state storage | No | `/app` |
 | `TZ` | Timezone | No | `UTC` |
 
 ### Finding Discord Channel ID
@@ -298,8 +298,8 @@ The bot is organized with a clear modular structure:
 The project is designed for easy deployment with Docker:
 
 1. **Dockerfile**: Builds image from Python 3.11-slim
-2. **docker-compose.yml**: Defines service with volumes for persistent data
-3. **Volumes**: Stores bot state and logs
+2. **docker-compose.yml**: Defines service with a single volume for all persistent data
+3. **Volume**: Single volume stores both bot state and logs for simplicity
 4. **Security**: Runs container as non-root user
 
 ## Project Structure

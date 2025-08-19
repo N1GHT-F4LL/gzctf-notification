@@ -35,7 +35,8 @@ class GZCTFNotificationBot(commands.Bot):
         self.enable_events = config.enable_events
         
         # State file for persistent storage - use volume mount
-        state_dir = os.getenv("STATE_DIR", "/app/data")
+        # Using root directory since we now mount the entire /app folder
+        state_dir = os.getenv("STATE_DIR", "/app")
         os.makedirs(state_dir, exist_ok=True)
         self.state_file = os.path.join(state_dir, f"bot_state_game_{self.game_id}.json")
         

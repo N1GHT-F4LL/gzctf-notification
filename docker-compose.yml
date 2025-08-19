@@ -10,23 +10,20 @@ services:
     env_file:
       - .env
     
-    # Docker volumes for persistent data
+    # Docker volume for persistent data and logs
     volumes:
-      - gzctf-bot-data:/app/data
-      - gzctf-bot-logs:/app/logs
+      - gzctf-bot-volume:/app
     
     # Logging configuration
     logging:
       driver: "json-file"
       options:
-        max-size: "1G"
-        max-file: "5"
+        max-size: "2G"
+        max-file: "10"
 
-# Named volumes
+# Named volume
 volumes:
-  gzctf-bot-data:
-    driver: local
-  gzctf-bot-logs:
+  gzctf-bot-volume:
     driver: local
 
 networks:
