@@ -203,6 +203,31 @@ If you encounter issues, you can:
    python scripts/verify_permissions.py
    ```
 
+### Utility Scripts
+
+- **debug_api.py**: Debug GZCTF endpoints using the same cookie-based auth as the bot
+  - Run: `python scripts/debug_api.py`
+  - Logs auth status, game info, notices, events; detects 403 on events and warns
+- **test_simple.py**: Quick end-to-end test for auth + notices/events via `GZCTFClient`
+  - Run: `python scripts/test_simple.py`
+- **test_config.py**: Print the configuration loaded from `.env`
+  - Run: `python scripts/test_config.py`
+- **verify_permissions.py**: Verify guild/channel permissions and ensure the event channel is private
+  - Run: `python scripts/verify_permissions.py`
+- **generate_invite_link.py**: Generate a bot invite link with recommended permissions
+  - Run: `python scripts/generate_invite_link.py`
+
+### Editor/IDE import hints
+
+- Scripts under `scripts/` add the `bot/` folder to `sys.path` at runtime, so imports work when executing scripts.
+- If your IDE (Pylance/Pyright) reports "reportMissingImports" for `config` or `gzctf_client`, add this to `.vscode/settings.json`:
+  ```json
+  {
+    "python.analysis.extraPaths": ["./bot"]
+  }
+  ```
+  Alternatively, set `PYTHONPATH` to the `bot` folder for your editor session.
+
 ## Example Notifications
 
 ### First Blood Notification
