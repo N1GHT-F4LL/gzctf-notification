@@ -179,7 +179,7 @@ class GZCTFClient:
                     logger.debug(f"Ensured GZCTF_Token cookie on session for domain: {domain}")
 
                 async with session.get(
-                    f"{base_url}/api/games",
+                    f"{base_url}/api/game",
                     headers=self._get_headers()
                 ) as response:
                     logger.debug(f"Authentication check status: {response.status}")
@@ -458,12 +458,12 @@ class GZCTFClient:
             logger.error(f"Error fetching game events: {e}")
             return []
     
-    async def get_games(self) -> List[Dict[str, Any]]:
-        """Get list of available games"""
+    async def get_game(self) -> List[Dict[str, Any]]:
+        """Get list of available game"""
         try:
             # Ensure base_url doesn't end with slash to avoid double slashes
             base_url = self.config.base_url.rstrip('/')
-            url = f"{base_url}/api/games"
+            url = f"{base_url}/api/game"
             
             session = await self._ensure_session()
             async with session.get(
@@ -474,11 +474,11 @@ class GZCTFClient:
                     data = await response.json()
                     return data
                 else:
-                    logger.error(f"Failed to get games: {response.status}")
+                    logger.error(f"Failed to get game: {response.status}")
                     return []
                     
         except Exception as e:
-            logger.error(f"Error fetching games: {e}")
+            logger.error(f"Error fetching game: {e}")
             return []
     
     async def get_game_info(self, game_id: int) -> Optional[Dict[str, Any]]:

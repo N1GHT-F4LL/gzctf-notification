@@ -198,9 +198,9 @@ If you encounter issues, you can:
    ```bash
    python scripts/test_config.py
    ```
-4. **Check Discord permissions** using the permission checker:
+4. **Verify Discord permissions and private channel setup** using the verifier:
    ```bash
-   python scripts/check_discord_permissions.py
+   python scripts/verify_permissions.py
    ```
 
 ## Example Notifications

@@ -7,8 +7,8 @@ import sys
 import os
 from dotenv import load_dotenv
 
-# Add the bot directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bot'))
+# Add project root to the path so 'bot' package can be imported
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from bot.config import load_config
 
