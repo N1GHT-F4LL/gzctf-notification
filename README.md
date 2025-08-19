@@ -18,6 +18,8 @@ A Discord bot that monitors GZCTF platform for notifications and events, then pu
 - **Duplicate Prevention**: Tracks seen notifications to avoid spam
 - **Persistent State**: Remembers last notification ID across restarts
 - **Configurable**: Easy configuration via environment variables
+- **Smart Authentication**: Automatically refreshes authentication tokens to maintain connection
+- **Robust Error Handling**: Gracefully handles connection issues and API errors
 
 ## Supported Notification Types
 
@@ -158,13 +160,17 @@ docker-compose up -d
 ```
 
 The bot will:
-1. Authenticate with GZCTF platform
+1. Authenticate with GZCTF platform using cookie-based authentication
 2. Connect to Discord
 3. Create/setup channels:
    - **Public notification channel**: For general notices (First Blood, New Challenges, etc.)
    - **Private event channel**: For sensitive data (flag submissions, user activities, etc.)
 4. Start polling for notifications every 30 seconds (configurable)
 5. Send formatted notifications to the appropriate Discord channels
+6. Automatically refresh authentication when needed:
+   - Every 30 polling cycles (approximately 15 minutes with default settings)
+   - After 1 hour regardless of polling count
+   - When token validation fails
 
 ### Private Event Channel Management
 
@@ -229,6 +235,11 @@ Team: Team Beta
    - Check your GZCTF credentials
    - Ensure username/password are correct
    - Verify the GZCTF base URL is accessible
+   - The bot now uses cookie-based authentication with GZCTF_Token
+   - Authentication is refreshed automatically based on:
+     - Every 30 polling cycles (configurable)
+     - After 1 hour of operation (time-based refresh)
+     - When token validation fails
 
 2. **Discord Bot Permission Errors (403 Forbidden)**
    - Ensure the bot has been invited to your Discord server
@@ -273,8 +284,13 @@ The bot is organized with a clear modular structure:
 
 1. **config.py**: Manages configuration from environment variables
 2. **gzctf_client.py**: API client for communicating with GZCTF
+   - Handles cookie-based authentication with GZCTF_Token
+   - Manages session cookies with proper domain settings
+   - Implements automatic token refresh mechanisms
 3. **notification_formatter.py**: Formats notifications into Discord embeds
 4. **discord_bot.py**: Handles Discord connection and sending notifications
+   - Implements smart authentication refresh based on time and poll count
+   - Provides robust error handling for API and connection issues
 5. **main.py**: Entry point of the application
 
 ## Docker Deployment

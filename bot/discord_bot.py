@@ -126,7 +126,8 @@ class GZCTFNotificationBot(commands.Bot):
         """Poll for new notifications from GZCTF"""
         try:
             # Proactively re-authenticate periodically to ensure token is always fresh
-            auth_check_interval = 5  # Re-authenticate after every 5 polls
+            auth_check_interval = 30  # Re-authenticate after every 30 polls (increased from 5)
+            auth_time_interval = 3600  # Re-authenticate after 1 hour regardless of poll count
             current_time = datetime.now().timestamp()
             
             # Create static variables if they don't exist
@@ -135,10 +136,21 @@ class GZCTFNotificationBot(commands.Bot):
                 self._poll_count = 0
                 
             self._poll_count += 1
+            time_since_last_auth = current_time - self._last_auth_time
             
-            # Re-authenticate if poll count reached or token is no longer valid
-            if self._poll_count >= auth_check_interval or not await self.gzctf_client.is_authenticated():
-                logger.info(f"Performing scheduled re-authentication (poll count: {self._poll_count})")
+            # Re-authenticate if poll count reached, time interval reached, or token is no longer valid
+            if (self._poll_count >= auth_check_interval or 
+                time_since_last_auth >= auth_time_interval or 
+                not await self.gzctf_client.is_authenticated()):
+                
+                reason = "poll count reached"
+                if time_since_last_auth >= auth_time_interval:
+                    reason = "time interval reached"
+                elif not await self.gzctf_client.is_authenticated():
+                    reason = "token validation failed"
+                
+                logger.info(f"Performing scheduled re-authentication ({reason}, poll count: {self._poll_count})")
+                
                 if not await self.gzctf_client.authenticate():
                     logger.error("Failed to re-authenticate, skipping this poll cycle")
                     return
