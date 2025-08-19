@@ -39,6 +39,18 @@ class GZCTFClient:
             
             # Ensure base_url doesn't end with slash to avoid double slashes
             base_url = self.config.base_url.rstrip('/')
+            
+            # Đóng session cũ nếu có để tránh rò rỉ tài nguyên
+            if self.session is not None:
+                try:
+                    await self.session.close()
+                except Exception as e:
+                    logger.warning(f"Error closing existing session: {e}")
+            
+            # Tạo session mới cho mỗi lần xác thực
+            self.session = aiohttp.ClientSession()
+            logger.debug("Created new session for authentication")
+                
             async with self.session.post(
                 f"{base_url}/api/account/login",
                 json=login_data
@@ -46,16 +58,25 @@ class GZCTFClient:
                 if response.status == 200:
                     # Extract token from response headers or cookies
                     cookies = response.cookies
+                    token_value = None
+                    
                     if 'token' in cookies:
-                        self.auth_token = cookies['token'].value
+                        token_value = cookies['token'].value
+                        logger.debug("Found token in cookies")
                     else:
                         # Try to get from response headers
                         auth_header = response.headers.get('Authorization')
                         if auth_header and auth_header.startswith('Bearer '):
-                            self.auth_token = auth_header[7:]
+                            token_value = auth_header[7:]
+                            logger.debug("Found token in Authorization header")
                     
-                    logger.info("Successfully authenticated with GZCTF")
-                    return True
+                    if token_value:
+                        self.auth_token = token_value
+                        logger.info("Successfully authenticated with GZCTF")
+                        return True
+                    else:
+                        logger.error("Authentication succeeded but no token found")
+                        return False
                 else:
                     logger.error(f"Authentication failed: {response.status}")
                     logger.debug(f"Response content: {await response.text()}")
@@ -84,6 +105,9 @@ class GZCTFClient:
             
         try:
             base_url = self.config.base_url.rstrip('/')
+            if self.session is None:
+                self.session = aiohttp.ClientSession()
+                
             async with self.session.get(
                 f"{base_url}/api/games",
                 headers=self._get_headers()
@@ -100,6 +124,9 @@ class GZCTFClient:
             url = f"{base_url}/api/game/{game_id}/notices"
             params = {"count": count, "skip": skip}
             
+            if self.session is None:
+                self.session = aiohttp.ClientSession()
+                
             async with self.session.get(
                 url, 
                 params=params, 
@@ -134,6 +161,9 @@ class GZCTFClient:
                     if await self.authenticate():
                         logger.info("Re-authentication successful, retrying notices request...")
                         # Retry the request with new authentication
+                        if self.session is None:
+                            self.session = aiohttp.ClientSession()
+                            
                         async with self.session.get(url, params=params, headers=self._get_headers()) as retry_response:
                             if retry_response.status == 200:
                                 try:
@@ -181,20 +211,28 @@ class GZCTFClient:
                 "hideContainer": str(hide_container).lower()  # Convert boolean to string
             }
             headers = self._get_headers()
-            # Log chi tiết nếu debug
-            if hasattr(self.config, 'debug') and self.config.debug:
+            # Log in debug mode
+            debug_enabled = False
+            if hasattr(self.config, 'debug'):
+                debug_enabled = getattr(self.config, 'debug', False)
+                
+            if debug_enabled:
                 logger.debug(f"[DEBUG] Requesting events: {url} params={params} headers={headers}")
+                
+            if self.session is None:
+                self.session = aiohttp.ClientSession()
+                
             async with self.session.get(
                 url, 
                 params=params, 
                 headers=headers
             ) as response:
-                if hasattr(self.config, 'debug') and self.config.debug:
+                if debug_enabled:
                     logger.debug(f"[DEBUG] Game events response status: {response.status}")
                     logger.debug(f"[DEBUG] Game events response headers: {dict(response.headers)}")
                     text = await response.text()
                     logger.debug(f"[DEBUG] Game events response text: {text[:500]}")
-                    # parse lại JSON nếu status 200
+                    # parse again if status is 200
                     if response.status == 200:
                         try:
                             data = json.loads(text)
@@ -323,6 +361,9 @@ class GZCTFClient:
             base_url = self.config.base_url.rstrip('/')
             url = f"{base_url}/api/games"
             
+            if self.session is None:
+                self.session = aiohttp.ClientSession()
+                
             async with self.session.get(
                 url, 
                 headers=self._get_headers()
@@ -344,6 +385,9 @@ class GZCTFClient:
             base_url = self.config.base_url.rstrip('/')
             url = f"{base_url}/api/game/{game_id}"
             
+            if self.session is None:
+                self.session = aiohttp.ClientSession()
+                
             async with self.session.get(
                 url, 
                 headers=self._get_headers()
@@ -365,6 +409,9 @@ class GZCTFClient:
                     if await self.authenticate():
                         logger.info("Re-authentication successful, retrying game info request...")
                         # Retry the request with new authentication
+                        if self.session is None:
+                            self.session = aiohttp.ClientSession()
+                            
                         async with self.session.get(url, headers=self._get_headers()) as retry_response:
                             if retry_response.status == 200:
                                 try:

@@ -25,7 +25,8 @@ async def test_private_channel():
     """Test private channel permissions"""
     
     token = os.getenv("DISCORD_TOKEN")
-    guild_id = int(os.getenv("DISCORD_GUILD_ID")) if os.getenv("DISCORD_GUILD_ID") else None
+    guild_id_str = os.getenv("DISCORD_GUILD_ID")
+    guild_id = int(guild_id_str) if guild_id_str else None
     
     if not token or not guild_id:
         logger.error("Discord token and guild ID are required")
@@ -71,13 +72,17 @@ async def test_private_channel():
                 logger.warning("⚠️ Channel may not be private (@everyone can view)")
             
             # Check bot permissions
-            bot_member = guild.get_member(client.user.id)
-            bot_permissions = event_channel.permissions_for(bot_member)
+            bot_member = guild.get_member(client.user.id if client.user else 0)
+            if bot_member:
+                bot_permissions = event_channel.permissions_for(bot_member)
             
             logger.info("Bot permissions in event channel:")
-            logger.info(f"  View Channel: {bot_permissions.view_channel}")
-            logger.info(f"  Send Messages: {bot_permissions.send_messages}")
-            logger.info(f"  Embed Links: {bot_permissions.embed_links}")
+            if bot_member:
+                logger.info(f"  View Channel: {bot_permissions.view_channel}")
+                logger.info(f"  Send Messages: {bot_permissions.send_messages}")
+                logger.info(f"  Embed Links: {bot_permissions.embed_links}")
+            else:
+                logger.warning("  Bot member not found in guild")
             
         else:
             logger.info(f"Event channel '{event_channel_name}' not found")

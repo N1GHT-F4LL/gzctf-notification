@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 # Add the bot directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bot'))
 
-from config import load_config
+from bot.config import load_config
 
 # Load environment variables
 load_dotenv()

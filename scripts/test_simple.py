@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 # Add the bot directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bot'))
 
-from config import load_config
-from gzctf_client import GZCTFClient
+from bot.config import load_config
+from bot.gzctf_client import GZCTFClient
 
 # Load environment variables
 load_dotenv()
@@ -46,19 +46,25 @@ async def test_simple():
         
         # Test notices
         logger.info("Testing notices...")
-        notices = await client.get_game_notices(config.game_id, count=3)
-        if notices:
-            logger.info(f"✅ Notices working: {len(notices)} notices found")
+        if config.game_id is not None:
+            notices = await client.get_game_notices(config.game_id, count=3)
+            if notices:
+                logger.info(f"✅ Notices working: {len(notices)} notices found")
+            else:
+                logger.error("❌ Notices failed")
         else:
-            logger.error("❌ Notices failed")
+            logger.warning("⚠️ Skipping notices test: game_id is not set")
         
         # Test events
         logger.info("Testing events...")
-        events = await client.get_game_events(config.game_id, count=3)
-        if events:
-            logger.info(f"✅ Events working: {len(events)} events found")
+        if config.game_id is not None:
+            events = await client.get_game_events(config.game_id, count=3)
+            if events:
+                logger.info(f"✅ Events working: {len(events)} events found")
+            else:
+                logger.error("❌ Events failed")
         else:
-            logger.error("❌ Events failed")
+            logger.warning("⚠️ Skipping events test: game_id is not set")
     
     logger.info("=== Test completed ===")
 

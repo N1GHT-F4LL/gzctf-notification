@@ -10,7 +10,7 @@ from datetime import datetime
 # Add the bot directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bot'))
 
-from notification_formatter import NotificationFormatter
+from bot.notification_formatter import NotificationFormatter
 
 def test_formatting():
     """Test event formatting with sample data"""

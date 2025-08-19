@@ -125,13 +125,26 @@ class GZCTFNotificationBot(commands.Bot):
     async def poll_notifications(self):
         """Poll for new notifications from GZCTF"""
         try:
-            # Check if we're still authenticated
-            if not await self.gzctf_client.is_authenticated():
-                logger.warning("Authentication lost, attempting to re-authenticate...")
+            # Chủ động xác thực lại định kỳ để đảm bảo token luôn mới
+            auth_check_interval = 5  # Xác thực lại sau mỗi 5 lần poll
+            current_time = datetime.now().timestamp()
+            
+            # Tạo biến static nếu chưa có
+            if not hasattr(self, '_last_auth_time'):
+                self._last_auth_time = 0
+                self._poll_count = 0
+                
+            self._poll_count += 1
+            
+            # Xác thực lại nếu đã đủ số lần poll hoặc token không còn hiệu lực
+            if self._poll_count >= auth_check_interval or not await self.gzctf_client.is_authenticated():
+                logger.info(f"Performing scheduled re-authentication (poll count: {self._poll_count})")
                 if not await self.gzctf_client.authenticate():
                     logger.error("Failed to re-authenticate, skipping this poll cycle")
                     return
                 logger.info("Successfully re-authenticated")
+                self._last_auth_time = current_time
+                self._poll_count = 0
             
             # Get new notices if enabled
             if self.enable_notices:
@@ -199,7 +212,7 @@ class GZCTFNotificationBot(commands.Bot):
             game_info = await self.gzctf_client.get_game_info(self.game_id)
             if game_info:
                 self.game_title = game_info.get('title', f'Game {self.game_id}')
-                self.last_game_info_fetch = datetime.utcnow()
+                self.last_game_info_fetch = datetime.now()
                 logger.info(f"Updated game title: {self.game_title}")
                 # Save state when we successfully update game title
                 self.save_state()
@@ -406,7 +419,7 @@ class GZCTFNotificationBot(commands.Bot):
                 'events_disabled_due_to_auth': self.events_disabled_due_to_auth,
                 'game_id': self.game_id,
                 'game_title': self.game_title,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now().isoformat()
             }
             
             # Ensure directory exists and has proper permissions

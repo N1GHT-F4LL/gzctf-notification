@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 # Add the bot directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'bot'))
 
-from config import load_config
-from gzctf_client import GZCTFClient
+from bot.config import load_config
+from bot.gzctf_client import GZCTFClient
 
 # Load environment variables
 load_dotenv()
@@ -59,7 +59,8 @@ async def test_authentication():
         
         # Test notices endpoint
         logger.info(f"Testing notices endpoint for game {config.game_id}...")
-        notices = await client.get_game_notices(config.game_id, count=5)
+        game_id = config.game_id or 1  # Default to 1 if None
+        notices = await client.get_game_notices(game_id, count=5)
         logger.info(f"Notices result: {len(notices) if notices else 0} notices found")
         if notices:
             for notice in notices[:3]:  # Show first 3 notices
@@ -67,7 +68,7 @@ async def test_authentication():
         
         # Test events endpoint
         logger.info(f"Testing events endpoint for game {config.game_id}...")
-        events = await client.get_game_events(config.game_id, count=5)
+        events = await client.get_game_events(game_id, count=5)
         logger.info(f"Events result: {len(events) if events else 0} events found")
         if events:
             for event in events[:3]:  # Show first 3 events
