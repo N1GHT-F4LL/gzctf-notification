@@ -1,5 +1,5 @@
-discord.py
-aiohttp
-python-dotenv
-websockets
-pynacl
+discord.py>=2.5.2
+aiohttp>= 3.12.15
+python-dotenv>=1.1.1
+websockets>=15.0.1
+pynacl>=1.5.0
