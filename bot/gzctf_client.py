@@ -17,6 +17,8 @@ class GZCTFClient:
         self.session: Optional[aiohttp.ClientSession] = None
         self.auth_token: Optional[str] = None
         self._auth_lock = asyncio.Lock()
+        # Set to True if server returns 403 for events (insufficient privileges)
+        self.events_forbidden: bool = False
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         """Ensure there is an open aiohttp ClientSession with a permissive CookieJar."""
@@ -369,11 +371,18 @@ class GZCTFClient:
                                         return []
                                 else:
                                     logger.error(f"Failed to get game events after re-auth: {retry_response.status}")
+                                    if retry_response.status == 403:
+                                        self.events_forbidden = True
                                     logger.debug(f"Response content: {await retry_response.text()}")
                                     return []
                         else:
                             logger.error("Re-authentication failed")
                             return []
+                    elif response.status == 403:
+                        # Insufficient privileges for events; don't keep retrying
+                        self.events_forbidden = True
+                        logger.error("Events endpoint returned 403 Forbidden - disabling further event polling")
+                        return []
                     else:
                         logger.error(f"Failed to get game events: {response.status}")
                         logger.debug(f"Response content: {text}")
@@ -429,11 +438,18 @@ class GZCTFClient:
                                         return []
                                 else:
                                     logger.error(f"Failed to get game events after re-auth: {retry_response.status}")
+                                    if retry_response.status == 403:
+                                        self.events_forbidden = True
                                     logger.debug(f"Response content: {await retry_response.text()}")
                                     return []
                         else:
                             logger.error("Re-authentication failed")
                             return []
+                    elif response.status == 403:
+                        # Insufficient privileges for events; don't keep retrying
+                        self.events_forbidden = True
+                        logger.error("Events endpoint returned 403 Forbidden - disabling further event polling")
+                        return []
                     else:
                         logger.error(f"Failed to get game events: {response.status}")
                         logger.debug(f"Response content: {await response.text()}")

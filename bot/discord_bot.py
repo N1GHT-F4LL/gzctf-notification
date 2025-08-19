@@ -39,6 +39,26 @@ class GZCTFNotificationBot(commands.Bot):
         state_dir = os.getenv("STATE_DIR", "/app")
         os.makedirs(state_dir, exist_ok=True)
         self.state_file = os.path.join(state_dir, f"bot_state_game_{self.game_id}.json")
+
+        # Initialize runtime state before any events fire
+        self.last_notice_id = None
+        self.last_event_time = None
+        self.events_failure_count = 0
+        self.events_disabled_due_to_auth = False
+
+        # Channel IDs
+        self.notification_channel_id = None
+        self.event_channel_id = None
+
+        # Notification formatter
+        self.formatter = NotificationFormatter(self.config)
+
+        # Game info cache
+        self.game_title = None
+        self.last_game_info_fetch = None
+
+        # Load persisted state (may set events_disabled_due_to_auth, last_notice_id, etc.)
+        self.load_state()
         
     async def close(self):
         """Close the bot and clean up resources"""
@@ -54,31 +74,7 @@ class GZCTFNotificationBot(commands.Bot):
         # Call parent close method
         await super().close()
         
-        # Load previous state or initialize
-        self.last_notice_id = None
-        self.last_event_time = None
-        self.events_failure_count = 0
-        self.events_disabled_due_to_auth = False
-        
-        # Initialize channel IDs to prevent AttributeError
-        self.notification_channel_id = None
-        self.event_channel_id = None
-        
-        self.load_state()
-        
-        # Notification formatter with config
-        self.formatter = NotificationFormatter(self.config)
-        
-        # Game info cache
-        self.game_title = None
-        self.last_game_info_fetch = None
-        
-        # Start polling task
-        self.poll_notifications.change_interval(seconds=self.poll_interval)
-        self.poll_notifications.start()
-        
-        # Start game info update task (every 30 minutes)
-        self.update_game_info.start()
+        # Do not reinitialize state or start tasks on close
         
 
     
@@ -89,6 +85,13 @@ class GZCTFNotificationBot(commands.Bot):
     async def setup_hook(self):
         """Setup hook called when bot starts"""
         logger.info("Bot setup complete")
+        # Start background tasks here with the configured interval
+        try:
+            self.poll_notifications.change_interval(seconds=self.poll_interval)
+            self.poll_notifications.start()
+            self.update_game_info.start()
+        except Exception as e:
+            logger.error(f"Failed to start background tasks: {e}")
         
 
         
@@ -105,20 +108,15 @@ class GZCTFNotificationBot(commands.Bot):
             logger.error("Guild not found or GUILD_ID not set.")
             return
 
+        # Early permission checks before any channel operations
+        self._check_guild_permissions_and_maybe_disable_events(guild)
+
         # Get channel names from environment variables or use defaults
-        notification_channel_name = os.getenv("NOTIFICATION_CHANNEL_NAME", "notification")
-        event_channel_name = os.getenv("EVENT_CHANNEL_NAME", "event")
+        notification_channel_name, event_channel_name = self._get_channel_names_from_env()
 
         # Create or get notification channel only if notices are enabled
         if self.enable_notices:
-            notification_channel = discord.utils.get(guild.text_channels, name=notification_channel_name)
-            if not notification_channel:
-                try:
-                    notification_channel = await guild.create_text_channel(notification_channel_name)
-                    logger.info(f"Created notification channel: {notification_channel.name}")
-                except discord.Forbidden:
-                    logger.error(f"Missing permissions to create notification channel")
-            
+            notification_channel = await self._ensure_notification_channel(guild, notification_channel_name)
             if notification_channel:
                 self.notification_channel_id = notification_channel.id
                 logger.info(f"Using notification channel: {notification_channel.name} (ID: {notification_channel.id})")
@@ -129,130 +127,10 @@ class GZCTFNotificationBot(commands.Bot):
 
         # Create or get event channel only if events are enabled
         if self.enable_events and not self.events_disabled_due_to_auth:
-            event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
-
-            # Build permission overwrites for a private event channel
-            allowed_role_ids_env = os.getenv("EVENT_ALLOWED_ROLE_IDS", "").strip()
-            allowed_role_names_env = os.getenv("EVENT_ALLOWED_ROLE_NAMES", "").strip()
-            allowed_role_ids = set()
-            if allowed_role_ids_env:
-                for part in allowed_role_ids_env.split(','):
-                    part = part.strip()
-                    if part.isdigit():
-                        try:
-                            allowed_role_ids.add(int(part))
-                        except:
-                            pass
-            allowed_roles = []
-            # Find roles by ID first
-            for role_id in allowed_role_ids:
-                role = guild.get_role(role_id)
-                if role:
-                    allowed_roles.append(role)
-            # Find roles by name if provided
-            if allowed_role_names_env:
-                for name in [n.strip() for n in allowed_role_names_env.split(',') if n.strip()]:
-                    role_by_name = discord.utils.get(guild.roles, name=name)
-                    if role_by_name and role_by_name not in allowed_roles:
-                        allowed_roles.append(role_by_name)
-
-            # Default to Administrator roles if nothing configured
-            if not allowed_roles:
-                allowed_roles = [r for r in guild.roles if r.permissions.administrator]
-
-            overwrites: dict = {}
-            # Hide from everyone by default
-            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
-            # Ensure the bot can access and post in the channel
-            bot_member = guild.me
-            bot_role = None
-            if bot_member and bot_member.roles:
-                # Prefer the bot's highest role (not @everyone)
-                non_everyone_roles = [r for r in bot_member.roles if r != guild.default_role]
-                if non_everyone_roles:
-                    bot_role = max(non_everyone_roles, key=lambda r: r.position)
-            if bot_member:
-                overwrites[bot_member] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    embed_links=True,
-                    read_message_history=True
-                )
-            if bot_role:
-                overwrites[bot_role] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    embed_links=True,
-                    read_message_history=True
-                )
-            # Grant access to allowed roles
-            for role in allowed_roles:
-                overwrites[role] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    embed_links=True,
-                    read_message_history=True
-                )
-
-            if not event_channel:
-                try:
-                    event_channel = await guild.create_text_channel(event_channel_name, overwrites=overwrites)
-                    logger.info(f"Created event channel: {event_channel.name}")
-                except discord.Forbidden:
-                    logger.error("Missing permissions to create event channel - events will be disabled")
-                except Exception as e:
-                    logger.error(f"Failed to create event channel: {e}")
-            else:
-                # Ensure existing channel is private with correct permissions
-                try:
-                    # Apply @everyone deny
-                    await event_channel.set_permissions(guild.default_role, view_channel=False)
-                    # Apply bot permissions
-                    if bot_member:
-                        await event_channel.set_permissions(
-                            bot_member,
-                            view_channel=True,
-                            send_messages=True,
-                            embed_links=True,
-                            read_message_history=True
-                        )
-                    if bot_role:
-                        await event_channel.set_permissions(
-                            bot_role,
-                            view_channel=True,
-                            send_messages=True,
-                            embed_links=True,
-                            read_message_history=True
-                        )
-                    # Apply allowed roles
-                    for role in allowed_roles:
-                        await event_channel.set_permissions(
-                            role,
-                            view_channel=True,
-                            send_messages=True,
-                            embed_links=True,
-                            read_message_history=True
-                        )
-                    logger.info("Ensured event channel is private with correct permissions")
-                except discord.Forbidden:
-                    logger.error("Missing permissions to update event channel overwrites")
-                except Exception as e:
-                    logger.error(f"Failed to update event channel permissions: {e}")
-
+            event_channel = await self._ensure_event_channel(guild, event_channel_name)
             if event_channel:
                 self.event_channel_id = event_channel.id
                 logger.info(f"Using event channel: {event_channel.name} (ID: {event_channel.id})")
-                # Final verification: ensure the bot can view the channel
-                try:
-                    perms = event_channel.permissions_for(bot_member) if bot_member else None
-                    if not (perms and perms.view_channel):
-                        logger.warning("Bot does not have access to the event channel yet; attempting to grant access again")
-                        if bot_member:
-                            await event_channel.set_permissions(bot_member, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
-                        if bot_role:
-                            await event_channel.set_permissions(bot_role, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
-                except Exception:
-                    pass
             else:
                 logger.warning("Event channel not found and could not be created. Events will not be sent.")
         else:
@@ -267,6 +145,172 @@ class GZCTFNotificationBot(commands.Bot):
 
         # Fetch game info and set bot status
         await self.fetch_and_update_status()
+
+    def _get_channel_names_from_env(self) -> tuple[str, str]:
+        """Fetch notification and event channel names from environment with defaults."""
+        notification_channel_name = os.getenv("NOTIFICATION_CHANNEL_NAME", "notification")
+        event_channel_name = os.getenv("EVENT_CHANNEL_NAME", "event")
+        return notification_channel_name, event_channel_name
+
+    def _check_guild_permissions_and_maybe_disable_events(self, guild: discord.Guild) -> None:
+        """Log essential permissions and disable events early if impossible to manage channels."""
+        bot_member = guild.me
+        if not bot_member:
+            logger.error("Bot member not found in guild; cannot verify permissions")
+            return
+        gp = bot_member.guild_permissions
+        logger.info("Checking essential guild permissions before setup...")
+        required = {
+            'view_channel': gp.view_channel,
+            'send_messages': gp.send_messages,
+            'embed_links': gp.embed_links,
+            'read_message_history': gp.read_message_history,
+        }
+        for name, ok in required.items():
+            logger.info(f"  {'✅' if ok else '❌'} {name}")
+        if self.enable_events:
+            logger.info(f"  {'✅' if gp.manage_channels else '❌'} manage_channels (needed to auto-create private event channel)")
+            existing_event = discord.utils.get(guild.text_channels, name=os.getenv("EVENT_CHANNEL_NAME", "event"))
+            if not gp.manage_channels and not existing_event:
+                logger.warning("Events enabled but missing Manage Channels and event channel does not exist; disabling events")
+                self.events_disabled_due_to_auth = True
+                self.save_state()
+
+    async def _ensure_notification_channel(self, guild: discord.Guild, name: str) -> Optional[discord.TextChannel]:
+        """Create or fetch the notification channel if notices are enabled."""
+        channel = discord.utils.get(guild.text_channels, name=name)
+        if channel:
+            return channel
+        try:
+            channel = await guild.create_text_channel(name)
+            logger.info(f"Created notification channel: {channel.name}")
+            return channel
+        except discord.Forbidden:
+            logger.error("Missing permissions to create notification channel")
+        except Exception as e:
+            logger.error(f"Failed to create notification channel: {e}")
+        return None
+
+    def _get_allowed_roles_for_event(self, guild: discord.Guild) -> List[discord.Role]:
+        """Resolve allowed roles for event channel from env; default to admin roles if none specified."""
+        allowed_role_ids_env = os.getenv("EVENT_ALLOWED_ROLE_IDS", "").strip()
+        allowed_role_names_env = os.getenv("EVENT_ALLOWED_ROLE_NAMES", "").strip()
+        allowed_role_ids: set[int] = set()
+        if allowed_role_ids_env:
+            for part in allowed_role_ids_env.split(','):
+                part = part.strip()
+                if part.isdigit():
+                    try:
+                        allowed_role_ids.add(int(part))
+                    except Exception:
+                        pass
+        allowed_roles: List[discord.Role] = []
+        for role_id in allowed_role_ids:
+            role = guild.get_role(role_id)
+            if role:
+                allowed_roles.append(role)
+        if allowed_role_names_env:
+            for name in [n.strip() for n in allowed_role_names_env.split(',') if n.strip()]:
+                role_by_name = discord.utils.get(guild.roles, name=name)
+                if role_by_name and role_by_name not in allowed_roles:
+                    allowed_roles.append(role_by_name)
+        if not allowed_roles:
+            allowed_roles = [r for r in guild.roles if r.permissions.administrator]
+        return allowed_roles
+
+    async def _ensure_event_channel(self, guild: discord.Guild, name: str) -> Optional[discord.TextChannel]:
+        """Create or harden a private event channel with correct overwrites; return the channel or None."""
+        channel = discord.utils.get(guild.text_channels, name=name)
+        allowed_roles = self._get_allowed_roles_for_event(guild)
+
+        # Build permission overwrites
+        overwrites: dict = {}
+        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+        bot_member = guild.me
+        bot_role = None
+        if bot_member and bot_member.roles:
+            non_everyone_roles = [r for r in bot_member.roles if r != guild.default_role]
+            if non_everyone_roles:
+                bot_role = max(non_everyone_roles, key=lambda r: r.position)
+        if bot_member:
+            overwrites[bot_member] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        if bot_role:
+            overwrites[bot_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        for role in allowed_roles:
+            overwrites[role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+
+        if not channel:
+            try:
+                channel = await guild.create_text_channel(name, overwrites=overwrites)
+                logger.info(f"Created event channel: {channel.name}")
+            except discord.Forbidden:
+                logger.error("Missing permissions to create event channel - events will be disabled")
+                return None
+            except Exception as e:
+                logger.error(f"Failed to create event channel: {e}")
+                return None
+        else:
+            try:
+                await channel.set_permissions(guild.default_role, view_channel=False)
+                if bot_member:
+                    await channel.set_permissions(
+                        bot_member,
+                        view_channel=True,
+                        send_messages=True,
+                        embed_links=True,
+                        read_message_history=True
+                    )
+                if bot_role:
+                    await channel.set_permissions(
+                        bot_role,
+                        view_channel=True,
+                        send_messages=True,
+                        embed_links=True,
+                        read_message_history=True
+                    )
+                for role in allowed_roles:
+                    await channel.set_permissions(
+                        role,
+                        view_channel=True,
+                        send_messages=True,
+                        embed_links=True,
+                        read_message_history=True
+                    )
+                logger.info("Ensured event channel is private with correct permissions")
+            except discord.Forbidden:
+                logger.error("Missing permissions to update event channel overwrites")
+                return None
+            except Exception as e:
+                logger.error(f"Failed to update event channel permissions: {e}")
+                return None
+
+        # Final verification: ensure the bot can view the channel
+        try:
+            perms = channel.permissions_for(bot_member) if bot_member else None
+            if not (perms and perms.view_channel):
+                logger.warning("Bot does not have access to the event channel yet; attempting to grant access again")
+                if bot_member:
+                    await channel.set_permissions(bot_member, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
+                if bot_role:
+                    await channel.set_permissions(bot_role, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
+        except Exception:
+            pass
+        return channel
     
     @tasks.loop(seconds=30)
     async def poll_notifications(self):
@@ -324,7 +368,12 @@ class GZCTFNotificationBot(commands.Bot):
                 events = await self.gzctf_client.get_game_events(self.game_id, count=10)
                 logger.debug(f"Events result: {len(events) if events else 'None/Error'}")
                 
-                if events:
+                # If server has denied events with 403, disable events immediately
+                if getattr(self.gzctf_client, 'events_forbidden', False):
+                    logger.warning("Events endpoint is forbidden (403). Disabling events for this run.")
+                    self.events_disabled_due_to_auth = True
+                    self.save_state()
+                elif events:
                     logger.debug(f"Processing {len(events)} events...")
                     await self.process_events(events)
                     # Reset failure count on success
