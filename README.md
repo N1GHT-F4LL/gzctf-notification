@@ -70,16 +70,26 @@ A Discord bot that monitors GZCTF platform for notifications and events, then pu
    - Go to "OAuth2" > "URL Generator"
    - Select "bot" scope
    - Select the following permissions:
-     - **Send Messages** (Required for sending notifications)
-     - **Use Slash Commands** (Required for slash commands)
-     - **Embed Links** (For rich message formatting)
-     - **Use External Emojis** (For better message formatting)
-   - Use the generated URL to invite the bot to your server
-   - **If you want the bot to auto-create channels for notifications and events, grant it the `Manage Channels` permission.**
-   - The bot will auto-create (or use) two channels:
+     
+     **Required Permissions:**
+     - **Send Messages** - Allows bot to send notifications
+     - **Embed Links** - For rich embed message formatting
+     - **Read Message History** - Allows bot to read message history
+     - **View Channels** - Allows bot to see channels
+     
+     **Optional Permissions (Recommended):**
+     - **Manage Channels** - For automatic channel creation for notifications and events
+     - **Use External Emojis** - For better emoji formatting in messages
+     - **Mention Everyone** - To mention @everyone when necessary
+     
+   - Copy the generated URL and invite the bot to your server
+   
+   **Channel Configuration:**
+   - The bot will automatically create (or use existing) two channels:
      - **Notification channel** (public): For general notices like First Blood, New Challenges
      - **Event channel** (private): For sensitive data like flag submissions, user activities
-   - You can customize these names via environment variables.
+   - You can customize channel names via environment variables
+   - **Note**: If you don't grant `Manage Channels` permission, you need to manually create channels and configure permissions
 
 5. **Configure Environment**
    ```bash
@@ -269,17 +279,29 @@ Team: Team Beta
 2. **Discord Bot Permission Errors (403 Forbidden)**
    - Ensure the bot has been invited to your Discord server
    - Check that the bot has the following permissions in the target channel:
-     - **Send Messages**
-     - **Embed Links**
-     - **Use External Emojis**
+     - **Send Messages** (Required)
+     - **Embed Links** (Required)
+     - **View Channels** (Required)
+     - **Read Message History** (Recommended)
    - Verify `DISCORD_GUILD_ID` is correct
    - Make sure the bot can see and access the specified channel
    - Check channel permissions - the bot role must have permission to send messages
 
-3. **Bot Cannot Send Messages**
-   - Right-click on the target channel → Edit Channel → Permissions
-   - Add the bot role and ensure it has "Send Messages" permission
-   - Check if the channel has any permission overwrites that might block the bot
+3. **Bot không thể gửi tin nhắn**
+   - Chuột phải vào kênh đích → Edit Channel → Permissions
+   - Thêm role bot và đảm bảo có quyền "Send Messages"
+   - Kiểm tra xem kênh có permission overrides nào có thể chặn bot không
+   - Nếu bot không thể tạo kênh tự động, tạo kênh thủ công và cấp quyền:
+     ```
+     Kênh thông báo (công khai):
+     - @everyone: View Channel, Read Message History
+     - Bot: Send Messages, Embed Links, View Channel
+     
+     Kênh sự kiện (riêng tư):
+     - @everyone: Không có quyền gì
+     - Admin/Moderator: Tất cả quyền
+     - Bot: Send Messages, Embed Links, View Channel
+     ```
 
 4. **Discord Bot Not Responding**
    - Check the bot token is correct
