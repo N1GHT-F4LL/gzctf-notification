@@ -12,7 +12,7 @@ services:
 
     # Docker volume for persistent data and logs
     volumes:
-      - gzctf-bot-volume:/app
+      - gzctf-bot-volume:/app/logs
 
     # Logging configuration
     logging:
@@ -26,9 +26,6 @@ services:
         limits:
           cpus: '2.0'
           memory: 1G
-
-    environment:
-      - LOG_DIR=/app/logs
 
 volumes:
   gzctf-bot-volume:

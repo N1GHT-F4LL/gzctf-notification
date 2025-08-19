@@ -9,7 +9,6 @@ from typing import (
     cast,
     Tuple,
     Union,
-    Mapping,
 )
 from datetime import datetime
 import json
@@ -46,12 +45,11 @@ class GZCTFNotificationBot(commands.Bot):
         self.enable_events = config.enable_events
         self.send_online_message = getattr(config, "send_online_message", True)
 
-        # State file for persistent storage - use volume mount
-        # Using root directory since we now mount the entire /app folder
-        state_dir = os.getenv("STATE_DIR", "/app")
-        os.makedirs(state_dir, exist_ok=True)
+        # State file for persistent storage - use log dir
+        log_dir = os.getenv("LOG_DIR", "/app/logs")
+        os.makedirs(log_dir, exist_ok=True)
         self.state_file = os.path.join(
-            state_dir, f"bot_state_game_{self.game_id}.json"
+            log_dir, f"bot_state_game_{self.game_id}.json"
         )
 
         # Initialize runtime state before any events fire

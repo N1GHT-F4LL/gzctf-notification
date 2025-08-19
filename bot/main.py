@@ -26,6 +26,7 @@ EXIT_AUTH = 3
 
 logger = logging.getLogger(__name__)
 
+
 def _resolve_log_dir(explicit: Optional[str] = None) -> str:
     """Resolve the directory to store log files."""
     candidates = []
@@ -43,6 +44,7 @@ def _resolve_log_dir(explicit: Optional[str] = None) -> str:
         except Exception:
             continue
     return os.getcwd()
+
 
 def _configure_logging(debug: bool, explicit_log_dir: Optional[str]) -> None:
     """Configure logging for the bot."""
@@ -64,6 +66,7 @@ def _configure_logging(debug: bool, explicit_log_dir: Optional[str]) -> None:
         ]
     )
 
+
 def _validate_config(cfg) -> Optional[str]:
     """Validate the loaded configuration."""
     if not cfg.discord.token:
@@ -73,6 +76,7 @@ def _validate_config(cfg) -> Optional[str]:
     if not (cfg.gzctf.username and cfg.gzctf.password):
         return "Username and password are required. Set GZCTF_USERNAME and GZCTF_PASSWORD environment variables."
     return None
+
 
 def _log_startup_info(cfg) -> None:
     """Log startup information for the bot."""
@@ -84,6 +88,7 @@ def _log_startup_info(cfg) -> None:
     logger.info(f"Events Enabled: {cfg.enable_events}")
     logger.info(f"Debug Mode: {cfg.debug}")
     logger.info(f"Using username/password authentication for user: {cfg.gzctf.username}")
+
 
 async def main() -> int:
     """Main function to run the bot. Returns an exit code."""
@@ -120,6 +125,7 @@ async def main() -> int:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         return EXIT_UNEXPECTED
+
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
