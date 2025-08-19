@@ -90,11 +90,11 @@ class GZCTFNotificationBot(commands.Bot):
             logger.error("Guild not found or GUILD_ID not set.")
             return
 
-        # Lấy tên kênh từ biến môi trường hoặc mặc định
+        # Get channel names from environment variables or use defaults
         notification_channel_name = os.getenv("NOTIFICATION_CHANNEL_NAME", "notification")
         event_channel_name = os.getenv("EVENT_CHANNEL_NAME", "event")
 
-        # Tạo hoặc lấy kênh notification
+        # Create or get notification channel
         notification_channel = discord.utils.get(guild.text_channels, name=notification_channel_name)
         if not notification_channel:
             try:
@@ -106,7 +106,7 @@ class GZCTFNotificationBot(commands.Bot):
         if notification_channel:
             self.notification_channel_id = notification_channel.id
 
-        # Tạo hoặc lấy kênh event
+        # Create or get event channel
         event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
         if not event_channel:
             try:
@@ -125,18 +125,18 @@ class GZCTFNotificationBot(commands.Bot):
     async def poll_notifications(self):
         """Poll for new notifications from GZCTF"""
         try:
-            # Chủ động xác thực lại định kỳ để đảm bảo token luôn mới
-            auth_check_interval = 5  # Xác thực lại sau mỗi 5 lần poll
+            # Proactively re-authenticate periodically to ensure token is always fresh
+            auth_check_interval = 5  # Re-authenticate after every 5 polls
             current_time = datetime.now().timestamp()
             
-            # Tạo biến static nếu chưa có
+            # Create static variables if they don't exist
             if not hasattr(self, '_last_auth_time'):
                 self._last_auth_time = 0
                 self._poll_count = 0
                 
             self._poll_count += 1
             
-            # Xác thực lại nếu đã đủ số lần poll hoặc token không còn hiệu lực
+            # Re-authenticate if poll count reached or token is no longer valid
             if self._poll_count >= auth_check_interval or not await self.gzctf_client.is_authenticated():
                 logger.info(f"Performing scheduled re-authentication (poll count: {self._poll_count})")
                 if not await self.gzctf_client.authenticate():

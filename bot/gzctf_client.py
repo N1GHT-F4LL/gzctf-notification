@@ -47,20 +47,56 @@ class GZCTFClient:
                 except Exception as e:
                     logger.warning(f"Error closing existing session: {e}")
             
-            # Tạo session mới cho mỗi lần xác thực
-            self.session = aiohttp.ClientSession()
-            logger.debug("Created new session for authentication")
+            # Create a new session for each authentication with a cookie jar
+            cookie_jar = aiohttp.CookieJar(unsafe=True)  # Allow unsafe cookies (needed for some domains)
+            
+            # Extract domain from URL
+            from urllib.parse import urlparse
+            parsed_url = urlparse(base_url)
+            domain = parsed_url.netloc
+            logger.debug(f"Using domain for cookies: {domain}")
+            
+            self.session = aiohttp.ClientSession(cookie_jar=cookie_jar)
+            logger.debug("Created new session for authentication with custom cookie jar")
                 
             async with self.session.post(
                 f"{base_url}/api/account/login",
                 json=login_data
             ) as response:
                 if response.status == 200:
+                    # Log chi tiết về response
+                    logger.debug(f"Authentication response status: {response.status}")
+                    logger.debug(f"Authentication response headers: {dict(response.headers)}")
+                    
+                    # Log thông tin về cookies
+                    logger.debug(f"Cookies: {[f'{c.key}={c.value}' for c in response.cookies.values()]}")
+                    
+                    # Đọc nội dung response
+                    response_text = await response.text()
+                    logger.debug(f"Response body (first 200 chars): {response_text[:200]}")
+                    
                     # Extract token from response headers or cookies
                     cookies = response.cookies
                     token_value = None
                     
-                    if 'token' in cookies:
+                    # Only check for 'GZCTF_Token' cookie (based on logs)
+                    if 'GZCTF_Token' in cookies:
+                        token_value = cookies['GZCTF_Token'].value
+                        logger.debug("Found GZCTF_Token cookie")
+                        # Save cookie to session
+                        from urllib.parse import urlparse
+                        parsed_url = urlparse(base_url)
+                        domain = parsed_url.netloc
+                        
+                        # Create cookie with correct domain
+                        from http.cookies import SimpleCookie
+                        cookie = SimpleCookie()
+                        cookie["GZCTF_Token"] = token_value
+                        cookie["GZCTF_Token"]["domain"] = domain
+                        cookie["GZCTF_Token"]["path"] = "/"
+                        self.session.cookie_jar.update_cookies(cookie)
+                        logger.debug(f"Added GZCTF_Token cookie to session for domain: {domain}")
+                    elif 'token' in cookies:
                         token_value = cookies['token'].value
                         logger.debug("Found token in cookies")
                     else:
@@ -69,6 +105,15 @@ class GZCTFClient:
                         if auth_header and auth_header.startswith('Bearer '):
                             token_value = auth_header[7:]
                             logger.debug("Found token in Authorization header")
+                        else:
+                            # Thử tìm token trong response body nếu là JSON
+                            try:
+                                response_json = json.loads(response_text)
+                                if isinstance(response_json, dict) and 'token' in response_json:
+                                    token_value = response_json['token']
+                                    logger.debug("Found token in response body")
+                            except json.JSONDecodeError:
+                                logger.debug("Response is not JSON format")
                     
                     if token_value:
                         self.auth_token = token_value
@@ -94,7 +139,9 @@ class GZCTFClient:
         }
         
         if self.auth_token:
-            headers["Authorization"] = f"Bearer {self.auth_token}"
+            # Don't add token to header, use cookie instead
+            # GZCTF_Token cookie will be sent automatically by the session
+            logger.debug("Using GZCTF_Token cookie for authentication")
             
         return headers
     
@@ -106,14 +153,34 @@ class GZCTFClient:
         try:
             base_url = self.config.base_url.rstrip('/')
             if self.session is None:
-                self.session = aiohttp.ClientSession()
+                cookie_jar = aiohttp.CookieJar(unsafe=True)
+                if self.auth_token:
+                    # Add GZCTF_Token cookie to cookie jar
+                    from urllib.parse import urlparse
+                    parsed_url = urlparse(base_url)
+                    domain = parsed_url.netloc
+                    
+                    from http.cookies import SimpleCookie
+                    cookie = SimpleCookie()
+                    cookie["GZCTF_Token"] = self.auth_token
+                    cookie["GZCTF_Token"]["domain"] = domain
+                    cookie["GZCTF_Token"]["path"] = "/"
+                    cookie_jar.update_cookies(cookie)
+                    logger.debug(f"Added GZCTF_Token cookie to new session for domain: {domain}")
+                self.session = aiohttp.ClientSession(cookie_jar=cookie_jar)
+                logger.debug("Created new session with auth cookie")
                 
             async with self.session.get(
                 f"{base_url}/api/games",
                 headers=self._get_headers()
             ) as response:
-                return response.status != 401
-        except Exception:
+                logger.debug(f"Authentication check status: {response.status}")
+                if response.status == 401:
+                    logger.debug("Authentication check failed with 401")
+                    return False
+                return True
+        except Exception as e:
+            logger.error(f"Error checking authentication: {e}")
             return False
     
     async def get_game_notices(self, game_id: int, count: int = 100, skip: int = 0) -> List[Dict[str, Any]]:
