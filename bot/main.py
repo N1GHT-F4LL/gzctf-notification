@@ -26,6 +26,22 @@ EXIT_AUTH = 3
 
 logger = logging.getLogger(__name__)
 
+def _wellcome_art():
+    art = r"""
+.----------------------------------------------------------------------------------.
+|                                                                                  |
+|  ___  ____ ___  _____  ___   ___   _                       _                     |
+| / __||_  // __||_   _|| __| |   \ (_) ___ __  ___  _ _  __| |                    |
+|| (_ | / /| (__   | |  | _|  | |) || |(_-</ _|/ _ \| '_|/ _` |                    |
+| \___|/___|\___|  |_|  |_|   |___/ |_|/__/\__|\___/|_|  \__,_| Author: n1ghtf4ll  |
+|      _  _       _    _   __  _            _    _              ___       _        |
+|     | \| | ___ | |_ (_) / _|(_) __  __ _ | |_ (_) ___  _ _   | _ ) ___ | |_      |
+|     | .` |/ _ \|  _|| ||  _|| |/ _|/ _` ||  _|| |/ _ \| ' \  | _ \/ _ \|  _|     |
+|     |_|\_|\___/ \__||_||_|  |_|\__|\__,_| \__||_|\___/|_||_| |___/\___/ \__|     |
+|                                                                                  |
+'----------------------------------------------------------------------------------'
+"""
+    print(art)
 
 def _resolve_log_dir(explicit: Optional[str] = None) -> str:
     """Resolve the directory to store log files."""
@@ -93,6 +109,9 @@ def _log_startup_info(cfg) -> None:
 async def main() -> int:
     """Main function to run the bot. Returns an exit code."""
     try:
+        # Show welcome art
+        _wellcome_art()
+
         # Load environment and configuration
         load_dotenv()
         cfg = load_config()
