@@ -40,6 +40,20 @@ class GZCTFNotificationBot(commands.Bot):
         os.makedirs(state_dir, exist_ok=True)
         self.state_file = os.path.join(state_dir, f"bot_state_game_{self.game_id}.json")
         
+    async def close(self):
+        """Close the bot and clean up resources"""
+        # Ensure GZCTF client session is closed properly
+        if hasattr(self, 'gzctf_client') and self.gzctf_client and hasattr(self.gzctf_client, 'session'):
+            try:
+                if self.gzctf_client.session and not self.gzctf_client.session.closed:
+                    await self.gzctf_client.session.close()
+                    logger.info("Closed GZCTF client session")
+            except Exception as e:
+                logger.error(f"Error closing GZCTF client session: {e}")
+                
+        # Call parent close method
+        await super().close()
+        
         # Load previous state or initialize
         self.last_notice_id = None
         self.last_event_time = None
@@ -53,7 +67,7 @@ class GZCTFNotificationBot(commands.Bot):
         self.load_state()
         
         # Notification formatter with config
-        self.formatter = NotificationFormatter(config)
+        self.formatter = NotificationFormatter(self.config)
         
         # Game info cache
         self.game_title = None

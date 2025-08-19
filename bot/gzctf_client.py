@@ -40,10 +40,11 @@ class GZCTFClient:
             # Ensure base_url doesn't end with slash to avoid double slashes
             base_url = self.config.base_url.rstrip('/')
             
-            # Đóng session cũ nếu có để tránh rò rỉ tài nguyên
+            # Properly close existing session to prevent resource leaks
             if self.session is not None:
                 try:
-                    await self.session.close()
+                    if not self.session.closed:
+                        await self.session.close()
                 except Exception as e:
                     logger.warning(f"Error closing existing session: {e}")
             
@@ -56,7 +57,9 @@ class GZCTFClient:
             domain = parsed_url.netloc
             logger.debug(f"Using domain for cookies: {domain}")
             
-            self.session = aiohttp.ClientSession(cookie_jar=cookie_jar)
+            # Create a new session with connector_owner=True to ensure connector is closed with session
+            connector = aiohttp.TCPConnector(force_close=True)
+            self.session = aiohttp.ClientSession(cookie_jar=cookie_jar, connector=connector)
             logger.debug("Created new session for authentication with custom cookie jar")
                 
             async with self.session.post(
