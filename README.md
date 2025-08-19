@@ -287,19 +287,19 @@ Team: Team Beta
    - Make sure the bot can see and access the specified channel
    - Check channel permissions - the bot role must have permission to send messages
 
-3. **Bot không thể gửi tin nhắn**
-   - Chuột phải vào kênh đích → Edit Channel → Permissions
-   - Thêm role bot và đảm bảo có quyền "Send Messages"
-   - Kiểm tra xem kênh có permission overrides nào có thể chặn bot không
-   - Nếu bot không thể tạo kênh tự động, tạo kênh thủ công và cấp quyền:
+3. **Bot Cannot Send Messages**
+   - Right-click on the target channel → Edit Channel → Permissions
+   - Add the bot role and ensure it has "Send Messages" permission
+   - Check if the channel has any permission overwrites that might block the bot
+   - If bot cannot auto-create channels, manually create channels and set permissions:
      ```
-     Kênh thông báo (công khai):
+     Notification Channel (Public):
      - @everyone: View Channel, Read Message History
      - Bot: Send Messages, Embed Links, View Channel
      
-     Kênh sự kiện (riêng tư):
-     - @everyone: Không có quyền gì
-     - Admin/Moderator: Tất cả quyền
+     Event Channel (Private):
+     - @everyone: No permissions
+     - Admin/Moderator: All permissions
      - Bot: Send Messages, Embed Links, View Channel
      ```
 
