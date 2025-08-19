@@ -94,29 +94,44 @@ class GZCTFNotificationBot(commands.Bot):
         notification_channel_name = os.getenv("NOTIFICATION_CHANNEL_NAME", "notification")
         event_channel_name = os.getenv("EVENT_CHANNEL_NAME", "event")
 
-        # Create or get notification channel
-        notification_channel = discord.utils.get(guild.text_channels, name=notification_channel_name)
-        if not notification_channel:
-            try:
-                notification_channel = await guild.create_text_channel(notification_channel_name)
-                logger.info(f"Created notification channel: {notification_channel.name}")
-            except discord.Forbidden:
-                logger.error(f"Missing permissions to create notification channel")
-        
-        if notification_channel:
-            self.notification_channel_id = notification_channel.id
+        # Create or get notification channel only if notices are enabled
+        if self.enable_notices:
+            notification_channel = discord.utils.get(guild.text_channels, name=notification_channel_name)
+            if not notification_channel:
+                try:
+                    notification_channel = await guild.create_text_channel(notification_channel_name)
+                    logger.info(f"Created notification channel: {notification_channel.name}")
+                except discord.Forbidden:
+                    logger.error(f"Missing permissions to create notification channel")
+            
+            if notification_channel:
+                self.notification_channel_id = notification_channel.id
+                logger.info(f"Using notification channel: {notification_channel.name} (ID: {notification_channel.id})")
+            else:
+                logger.warning("Notification channel not found and could not be created. Notices will not be sent.")
+        else:
+            logger.info("Notices are disabled in configuration. Notification channel will not be created.")
 
-        # Create or get event channel
-        event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
-        if not event_channel:
-            try:
-                event_channel = await guild.create_text_channel(event_channel_name)
-                logger.info(f"Created event channel: {event_channel.name}")
-            except discord.Forbidden:
-                logger.info(f"Missing permissions to create event channel - events will be disabled")
-        
-        if event_channel:
-            self.event_channel_id = event_channel.id
+        # Create or get event channel only if events are enabled
+        if self.enable_events and not self.events_disabled_due_to_auth:
+            event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
+            if not event_channel:
+                try:
+                    event_channel = await guild.create_text_channel(event_channel_name)
+                    logger.info(f"Created event channel: {event_channel.name}")
+                except discord.Forbidden:
+                    logger.error(f"Missing permissions to create event channel - events will be disabled")
+            
+            if event_channel:
+                self.event_channel_id = event_channel.id
+                logger.info(f"Using event channel: {event_channel.name} (ID: {event_channel.id})")
+            else:
+                logger.warning("Event channel not found and could not be created. Events will not be sent.")
+        else:
+            if self.events_disabled_due_to_auth:
+                logger.info("Events are disabled due to authentication issues. Event channel will not be created.")
+            else:
+                logger.info("Events are disabled in configuration. Event channel will not be created.")
 
         # Fetch game info and set bot status
         await self.fetch_and_update_status()

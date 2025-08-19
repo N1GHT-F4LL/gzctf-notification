@@ -162,9 +162,9 @@ docker-compose up -d
 The bot will:
 1. Authenticate with GZCTF platform using cookie-based authentication
 2. Connect to Discord
-3. Create/setup channels:
-   - **Public notification channel**: For general notices (First Blood, New Challenges, etc.)
-   - **Private event channel**: For sensitive data (flag submissions, user activities, etc.)
+3. Create/setup channels based on configuration:
+   - **Public notification channel**: Created only if ENABLE_NOTICES=true
+   - **Private event channel**: Created only if ENABLE_EVENTS=true
 4. Start polling for notifications every 30 seconds (configurable)
 5. Send formatted notifications to the appropriate Discord channels
 6. Automatically refresh authentication when needed:
