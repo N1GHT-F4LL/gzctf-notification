@@ -317,7 +317,7 @@ class GZCTFNotificationBot(commands.Bot):
         """Poll for new notifications from GZCTF"""
         try:
             # Proactively re-authenticate periodically to ensure token is always fresh
-            auth_check_interval = 30  # Re-authenticate after every 30 polls (increased from 5)
+            auth_check_interval = 100  # Re-authenticate after every 100 polls (increased from 5)
             auth_time_interval = 3600  # Re-authenticate after 1 hour regardless of poll count
             current_time = datetime.now().timestamp()
             
