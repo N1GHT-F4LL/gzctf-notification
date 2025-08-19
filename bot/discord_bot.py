@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union, cast
 from datetime import datetime
 import json
 import os
@@ -146,14 +146,17 @@ class GZCTFNotificationBot(commands.Bot):
                 self._last_auth_time = current_time
                 self._poll_count = 0
             
-            # Get new notices if enabled
-            if self.enable_notices:
+            # Get new notices if enabled and game_id is set
+            if self.enable_notices and self.game_id is not None:
                 notices = await self.gzctf_client.get_game_notices(self.game_id, count=10)
                 if notices:
                     await self.process_notices(notices)
+            elif self.enable_notices:
+                logger.warning("Notices enabled but game_id is not set")
             
-            # Get new events if enabled and event channel exists
-            if self.enable_events and self.event_channel_id and not self.events_disabled_due_to_auth:
+            # Get new events if enabled and event channel exists and game_id is set
+            events = None
+            if self.enable_events and self.event_channel_id and not self.events_disabled_due_to_auth and self.game_id is not None:
                 logger.debug(f"Fetching events for game {self.game_id}...")
                 events = await self.gzctf_client.get_game_events(self.game_id, count=10)
                 logger.debug(f"Events result: {len(events) if events else 'None/Error'}")
@@ -171,11 +174,14 @@ class GZCTFNotificationBot(commands.Bot):
                     # If events is None, it means there was an error (likely 401)
                     self.events_failure_count += 1
                     logger.warning(f"Events endpoint failed (attempt {self.events_failure_count}/5)")
+            elif self.enable_events and not self.events_disabled_due_to_auth and self.game_id is None:
+                logger.warning("Events enabled but game_id is not set")
                     
-                    if self.events_failure_count >= 5:
-                        logger.warning("Events endpoint has failed 5 times, disabling events due to authentication issues")
-                        self.events_disabled_due_to_auth = True
-                        self.save_state()
+            # Check if we need to disable events due to repeated failures
+            if self.events_failure_count >= 5:
+                logger.warning("Events endpoint has failed 5 times, disabling events due to authentication issues")
+                self.events_disabled_due_to_auth = True
+                self.save_state()
             else:
                 # Skip events silently - no error logging needed
                 pass
@@ -208,18 +214,22 @@ class GZCTFNotificationBot(commands.Bot):
                     logger.error("Failed to authenticate for game info")
                     return
             
-            # Fetch game info
-            game_info = await self.gzctf_client.get_game_info(self.game_id)
-            if game_info:
-                self.game_title = game_info.get('title', f'Game {self.game_id}')
-                self.last_game_info_fetch = datetime.now()
-                logger.info(f"Updated game title: {self.game_title}")
-                # Save state when we successfully update game title
-                self.save_state()
+            # Fetch game info if game_id is set
+            if self.game_id is not None:
+                game_info = await self.gzctf_client.get_game_info(self.game_id)
+                if game_info:
+                    self.game_title = game_info.get('title', f'Game {self.game_id}')
+                    self.last_game_info_fetch = datetime.now()
+                    logger.info(f"Updated game title: {self.game_title}")
+                    # Save state when we successfully update game title
+                    self.save_state()
+                else:
+                    logger.warning(f"Failed to fetch game info for ID {self.game_id}")
+                    if not self.game_title:
+                        self.game_title = f"Game {self.game_id}"
             else:
-                logger.warning(f"Failed to fetch game info for ID {self.game_id}")
-                if not self.game_title:
-                    self.game_title = f"Game {self.game_id}"
+                logger.warning("Game ID not set, cannot fetch game info")
+                self.game_title = "No Game ID Set"
             
             # Update bot status
             await self.update_bot_status()
@@ -268,8 +278,8 @@ class GZCTFNotificationBot(commands.Bot):
             if self.last_notice_id and notice_id <= self.last_notice_id:
                 continue
                 
-            # Update last seen ID
-            if not self.last_notice_id or notice_id > self.last_notice_id:
+            # Update last seen ID if notice_id is not None
+            if notice_id is not None and (not self.last_notice_id or notice_id > self.last_notice_id):
                 self.last_notice_id = notice_id
                 # Save state after updating
                 self.save_state()
@@ -326,27 +336,33 @@ class GZCTFNotificationBot(commands.Bot):
         logger.debug(f"Processed {new_events_count} new events out of {len(events)} total")
     
     async def send_notification(self, embed: discord.Embed, notification_type: str = 'unknown', 
-                              content_type: str = 'Normal', values: List[str] = None, 
-                              notification_id: int = None, timestamp: int = None,
-                              user: str = None, team: str = None):
+                              content_type: str = 'Normal', values: Optional[List[str]] = None, 
+                              notification_id: Optional[int] = None, timestamp: Optional[int] = None,
+                              user: Optional[str] = None, team: Optional[str] = None):
         """Send notification embed to correct Discord channel with detailed logging"""
         try:
             if notification_type == 'notice':
                 if not self.notification_channel_id:
                     logger.error("Notification channel ID not set. Channel may not have been created.")
                     return
-                channel = self.get_channel(self.notification_channel_id)
+                channel_id = self.notification_channel_id
                 channel_type_desc = "notification"
             elif notification_type == 'event':
                 # Event channel check is now done in process_events before calling this method
-                channel = self.get_channel(self.event_channel_id)
+                if not self.event_channel_id:
+                    logger.error("Event channel ID not set. Channel may not have been created.")
+                    return
+                channel_id = self.event_channel_id
                 channel_type_desc = "event"
             else:
                 logger.error(f"Unknown notification type '{notification_type}', cannot send message.")
                 return
-                
-            if channel:
-                await channel.send(embed=embed)
+            
+            channel = self.get_channel(channel_id)
+            if channel and hasattr(channel, 'send'):
+                # Cast to the correct type that has send method
+                text_channel = cast(discord.TextChannel, channel)
+                await text_channel.send(embed=embed)
                 
                 # Create detailed log message
                 log_parts = []
