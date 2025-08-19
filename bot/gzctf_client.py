@@ -16,14 +16,36 @@ class GZCTFClient:
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
         self.auth_token: Optional[str] = None
+        self._auth_lock = asyncio.Lock()
+
+    async def _ensure_session(self) -> aiohttp.ClientSession:
+        """Ensure there is an open aiohttp ClientSession with a permissive CookieJar."""
+        connector_closed = False
+        if self.session is not None:
+            try:
+                connector = getattr(self.session, 'connector', None)
+                connector_closed = connector is None or getattr(connector, 'closed', False)
+            except Exception:
+                connector_closed = True
+        if self.session is None or self.session.closed or connector_closed:
+            # Close any lingering session just in case
+            if self.session is not None:
+                try:
+                    await self.session.close()
+                except Exception:
+                    pass
+            cookie_jar = aiohttp.CookieJar(unsafe=True)
+            self.session = aiohttp.ClientSession(cookie_jar=cookie_jar)
+        return self.session
         
     async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
+        await self._ensure_session()
         return self
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.session:
             await self.session.close()
+            self.session = None
     
     async def authenticate(self) -> bool:
         """Authenticate with GZCTF API using username/password"""
@@ -32,103 +54,87 @@ class GZCTFClient:
             return False
             
         try:
-            login_data = {
-                "userName": self.config.username,
-                "password": self.config.password
-            }
-            
-            # Ensure base_url doesn't end with slash to avoid double slashes
-            base_url = self.config.base_url.rstrip('/')
-            
-            # Properly close existing session to prevent resource leaks
-            if self.session is not None:
-                try:
-                    if not self.session.closed:
-                        await self.session.close()
-                except Exception as e:
-                    logger.warning(f"Error closing existing session: {e}")
-            
-            # Create a new session for each authentication with a cookie jar
-            cookie_jar = aiohttp.CookieJar(unsafe=True)  # Allow unsafe cookies (needed for some domains)
-            
-            # Extract domain from URL
-            from urllib.parse import urlparse
-            parsed_url = urlparse(base_url)
-            domain = parsed_url.netloc
-            logger.debug(f"Using domain for cookies: {domain}")
-            
-            # Create a new session with connector_owner=True to ensure connector is closed with session
-            connector = aiohttp.TCPConnector(force_close=True)
-            self.session = aiohttp.ClientSession(cookie_jar=cookie_jar, connector=connector)
-            logger.debug("Created new session for authentication with custom cookie jar")
+            async with self._auth_lock:
+                login_data = {
+                    "userName": self.config.username,
+                    "password": self.config.password
+                }
                 
-            async with self.session.post(
-                f"{base_url}/api/account/login",
-                json=login_data
-            ) as response:
-                if response.status == 200:
-                    # Log chi tiết về response
-                    logger.debug(f"Authentication response status: {response.status}")
-                    logger.debug(f"Authentication response headers: {dict(response.headers)}")
+                # Ensure base_url doesn't end with slash to avoid double slashes
+                base_url = self.config.base_url.rstrip('/')
+                
+                # Ensure we have a session (do not close an existing one to avoid racing other tasks)
+                session = await self._ensure_session()
+
+                async with session.post(
+                    f"{base_url}/api/account/login",
+                    json=login_data
+                ) as response:
+                    if response.status == 200:
+                        # Detailed response logging
+                        logger.debug(f"Authentication response status: {response.status}")
+                        logger.debug(f"Authentication response headers: {dict(response.headers)}")
                     
-                    # Log thông tin về cookies
-                    logger.debug(f"Cookies: {[f'{c.key}={c.value}' for c in response.cookies.values()]}")
+                        # Log cookie information
+                        logger.debug(f"Cookies: {[f'{c.key}={c.value}' for c in response.cookies.values()]}")
                     
-                    # Đọc nội dung response
-                    response_text = await response.text()
-                    logger.debug(f"Response body (first 200 chars): {response_text[:200]}")
+                        # Read response body
+                        response_text = await response.text()
+                        logger.debug(f"Response body (first 200 chars): {response_text[:200]}")
                     
-                    # Extract token from response headers or cookies
-                    cookies = response.cookies
-                    token_value = None
+                        # Extract token from response headers or cookies
+                        cookies = response.cookies
+                        token_value = None
                     
-                    # Only check for 'GZCTF_Token' cookie (based on logs)
-                    if 'GZCTF_Token' in cookies:
-                        token_value = cookies['GZCTF_Token'].value
-                        logger.debug("Found GZCTF_Token cookie")
+                        # Only check for 'GZCTF_Token' cookie (based on logs)
+                        if 'GZCTF_Token' in cookies:
+                            token_value = cookies['GZCTF_Token'].value
+                            logger.debug("Found GZCTF_Token cookie")
                         # Save cookie to session
-                        from urllib.parse import urlparse
-                        parsed_url = urlparse(base_url)
-                        domain = parsed_url.netloc
+                            from urllib.parse import urlparse
+                            parsed_url = urlparse(base_url)
+                            domain = parsed_url.netloc
                         
                         # Create cookie with correct domain
-                        from http.cookies import SimpleCookie
-                        cookie = SimpleCookie()
-                        cookie["GZCTF_Token"] = token_value
-                        cookie["GZCTF_Token"]["domain"] = domain
-                        cookie["GZCTF_Token"]["path"] = "/"
-                        self.session.cookie_jar.update_cookies(cookie)
-                        logger.debug(f"Added GZCTF_Token cookie to session for domain: {domain}")
-                    elif 'token' in cookies:
-                        token_value = cookies['token'].value
-                        logger.debug("Found token in cookies")
-                    else:
-                        # Try to get from response headers
-                        auth_header = response.headers.get('Authorization')
-                        if auth_header and auth_header.startswith('Bearer '):
-                            token_value = auth_header[7:]
-                            logger.debug("Found token in Authorization header")
+                            from http.cookies import SimpleCookie
+                            cookie = SimpleCookie()
+                            cookie["GZCTF_Token"] = token_value
+                            cookie["GZCTF_Token"]["domain"] = domain
+                            cookie["GZCTF_Token"]["path"] = "/"
+                            # Ensure session still exists
+                            session = await self._ensure_session()
+                            session.cookie_jar.update_cookies(cookie)
+                            logger.debug(f"Added GZCTF_Token cookie to session for domain: {domain}")
+                        elif 'token' in cookies:
+                            token_value = cookies['token'].value
+                            logger.debug("Found token in cookies")
                         else:
-                            # Thử tìm token trong response body nếu là JSON
-                            try:
-                                response_json = json.loads(response_text)
-                                if isinstance(response_json, dict) and 'token' in response_json:
-                                    token_value = response_json['token']
-                                    logger.debug("Found token in response body")
-                            except json.JSONDecodeError:
-                                logger.debug("Response is not JSON format")
+                            # Try to get from response headers
+                            auth_header = response.headers.get('Authorization')
+                            if auth_header and auth_header.startswith('Bearer '):
+                                token_value = auth_header[7:]
+                                logger.debug("Found token in Authorization header")
+                            else:
+                                # Try to find token in JSON response body
+                                try:
+                                    response_json = json.loads(response_text)
+                                    if isinstance(response_json, dict) and 'token' in response_json:
+                                        token_value = response_json['token']
+                                        logger.debug("Found token in response body")
+                                except json.JSONDecodeError:
+                                    logger.debug("Response is not JSON format")
                     
-                    if token_value:
-                        self.auth_token = token_value
-                        logger.info("Successfully authenticated with GZCTF")
-                        return True
+                        if token_value:
+                            self.auth_token = token_value
+                            logger.info("Successfully authenticated with GZCTF")
+                            return True
+                        else:
+                            logger.error("Authentication succeeded but no token found")
+                            return False
                     else:
-                        logger.error("Authentication succeeded but no token found")
+                        logger.error(f"Authentication failed: {response.status}")
+                        logger.debug(f"Response content: {await response.text()}")
                         return False
-                else:
-                    logger.error(f"Authentication failed: {response.status}")
-                    logger.debug(f"Response content: {await response.text()}")
-                    return False
                     
         except Exception as e:
             logger.error(f"Authentication error: {e}")
@@ -153,36 +159,52 @@ class GZCTFClient:
         if not self.auth_token:
             return False
             
-        try:
-            base_url = self.config.base_url.rstrip('/')
-            if self.session is None:
-                cookie_jar = aiohttp.CookieJar(unsafe=True)
+        base_url = self.config.base_url.rstrip('/')
+
+        async def _check_once() -> bool:
+            # Ensure a valid session and cookie are present and perform check under the lock
+            async with self._auth_lock:
+                session = await self._ensure_session()
                 if self.auth_token:
-                    # Add GZCTF_Token cookie to cookie jar
                     from urllib.parse import urlparse
-                    parsed_url = urlparse(base_url)
-                    domain = parsed_url.netloc
-                    
                     from http.cookies import SimpleCookie
+                    domain = urlparse(base_url).netloc
                     cookie = SimpleCookie()
                     cookie["GZCTF_Token"] = self.auth_token
                     cookie["GZCTF_Token"]["domain"] = domain
                     cookie["GZCTF_Token"]["path"] = "/"
-                    cookie_jar.update_cookies(cookie)
-                    logger.debug(f"Added GZCTF_Token cookie to new session for domain: {domain}")
-                self.session = aiohttp.ClientSession(cookie_jar=cookie_jar)
-                logger.debug("Created new session with auth cookie")
-                
-            async with self.session.get(
-                f"{base_url}/api/games",
-                headers=self._get_headers()
-            ) as response:
-                logger.debug(f"Authentication check status: {response.status}")
-                if response.status == 401:
-                    logger.debug("Authentication check failed with 401")
-                    return False
-                return True
+                    session.cookie_jar.update_cookies(cookie)
+                    logger.debug(f"Ensured GZCTF_Token cookie on session for domain: {domain}")
+
+                async with session.get(
+                    f"{base_url}/api/games",
+                    headers=self._get_headers()
+                ) as response:
+                    logger.debug(f"Authentication check status: {response.status}")
+                    if response.status == 401:
+                        logger.debug("Authentication check failed with 401")
+                        return False
+                    return True
+
+        try:
+            return await _check_once()
         except Exception as e:
+            # Retry once on transient session/SSL close errors
+            msg = str(e)
+            if "Session is closed" in msg or "APPLICATION_DATA_AFTER_CLOSE_NOTIFY" in msg:
+                try:
+                    async with self._auth_lock:
+                        # Recreate session and retry
+                        if self.session is not None:
+                            try:
+                                await self.session.close()
+                            except Exception:
+                                pass
+                            self.session = None
+                    return await _check_once()
+                except Exception as e2:
+                    logger.error(f"Error checking authentication (after retry): {e2}")
+                    return False
             logger.error(f"Error checking authentication: {e}")
             return False
     
@@ -194,10 +216,8 @@ class GZCTFClient:
             url = f"{base_url}/api/game/{game_id}/notices"
             params = {"count": count, "skip": skip}
             
-            if self.session is None:
-                self.session = aiohttp.ClientSession()
-                
-            async with self.session.get(
+            session = await self._ensure_session()
+            async with session.get(
                 url, 
                 params=params, 
                 headers=self._get_headers()
@@ -231,10 +251,8 @@ class GZCTFClient:
                     if await self.authenticate():
                         logger.info("Re-authentication successful, retrying notices request...")
                         # Retry the request with new authentication
-                        if self.session is None:
-                            self.session = aiohttp.ClientSession()
-                            
-                        async with self.session.get(url, params=params, headers=self._get_headers()) as retry_response:
+                        session = await self._ensure_session()
+                        async with session.get(url, params=params, headers=self._get_headers()) as retry_response:
                             if retry_response.status == 200:
                                 try:
                                     data = await retry_response.json()
@@ -289,10 +307,8 @@ class GZCTFClient:
             if debug_enabled:
                 logger.debug(f"[DEBUG] Requesting events: {url} params={params} headers={headers}")
                 
-            if self.session is None:
-                self.session = aiohttp.ClientSession()
-                
-            async with self.session.get(
+            session = await self._ensure_session()
+            async with session.get(
                 url, 
                 params=params, 
                 headers=headers
@@ -330,7 +346,8 @@ class GZCTFClient:
                             logger.info("Re-authentication successful, retrying request...")
                             # Retry the request with new authentication
                             headers = self._get_headers()
-                            async with self.session.get(url, params=params, headers=headers) as retry_response:
+                            session = await self._ensure_session()
+                            async with session.get(url, params=params, headers=headers) as retry_response:
                                 if retry_response.status == 200:
                                     try:
                                         data = await retry_response.json()
@@ -389,7 +406,8 @@ class GZCTFClient:
                             logger.info("Re-authentication successful, retrying request...")
                             # Retry the request with new authentication
                             headers = self._get_headers()
-                            async with self.session.get(url, params=params, headers=headers) as retry_response:
+                            session = await self._ensure_session()
+                            async with session.get(url, params=params, headers=headers) as retry_response:
                                 if retry_response.status == 200:
                                     try:
                                         data = await retry_response.json()
@@ -431,10 +449,8 @@ class GZCTFClient:
             base_url = self.config.base_url.rstrip('/')
             url = f"{base_url}/api/games"
             
-            if self.session is None:
-                self.session = aiohttp.ClientSession()
-                
-            async with self.session.get(
+            session = await self._ensure_session()
+            async with session.get(
                 url, 
                 headers=self._get_headers()
             ) as response:
@@ -479,10 +495,8 @@ class GZCTFClient:
                     if await self.authenticate():
                         logger.info("Re-authentication successful, retrying game info request...")
                         # Retry the request with new authentication
-                        if self.session is None:
-                            self.session = aiohttp.ClientSession()
-                            
-                        async with self.session.get(url, headers=self._get_headers()) as retry_response:
+                        session = await self._ensure_session()
+                        async with session.get(url, headers=self._get_headers()) as retry_response:
                             if retry_response.status == 200:
                                 try:
                                     data = await retry_response.json()

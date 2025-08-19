@@ -148,6 +148,10 @@ class GZCTFNotificationBot(commands.Bot):
             else:
                 logger.info("Events are disabled in configuration. Event channel will not be created.")
 
+        # Initialize auth timing to avoid immediate first-loop re-auth
+        self._last_auth_time = datetime.now().timestamp()
+        self._poll_count = 0
+
         # Fetch game info and set bot status
         await self.fetch_and_update_status()
     
@@ -162,21 +166,25 @@ class GZCTFNotificationBot(commands.Bot):
             
             # Create static variables if they don't exist
             if not hasattr(self, '_last_auth_time'):
-                self._last_auth_time = 0
+                self._last_auth_time = current_time
                 self._poll_count = 0
                 
             self._poll_count += 1
             time_since_last_auth = current_time - self._last_auth_time
             
             # Re-authenticate if poll count reached, time interval reached, or token is no longer valid
-            if (self._poll_count >= auth_check_interval or 
+            token_ok = await self.gzctf_client.is_authenticated()
+            need_reauth = (
+                self._poll_count >= auth_check_interval or 
                 time_since_last_auth >= auth_time_interval or 
-                not await self.gzctf_client.is_authenticated()):
+                not token_ok
+            )
+            if need_reauth:
                 
                 reason = "poll count reached"
                 if time_since_last_auth >= auth_time_interval:
                     reason = "time interval reached"
-                elif not await self.gzctf_client.is_authenticated():
+                elif not token_ok:
                     reason = "token validation failed"
                 
                 logger.info(f"Performing scheduled re-authentication ({reason}, poll count: {self._poll_count})")

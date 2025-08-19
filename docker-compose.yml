@@ -1,19 +1,21 @@
+version: "3.8"
+
 services:
   gzctf-bot:
+    container_name: gzctf-discord-bot
     build: 
       context: .
       dockerfile: Dockerfile
-    container_name: gzctf-discord-bot
     restart: unless-stopped
-    
+
     # Environment variables from .env file
     env_file:
       - .env
-    
+
     # Docker volume for persistent data and logs
     volumes:
       - gzctf-bot-volume:/app
-    
+
     # Logging configuration
     logging:
       driver: "json-file"
@@ -21,7 +23,12 @@ services:
         max-size: "2G"
         max-file: "10"
 
-# Named volume
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+
 volumes:
   gzctf-bot-volume:
     driver: local
