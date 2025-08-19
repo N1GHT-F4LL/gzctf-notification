@@ -1,9 +1,7 @@
 import discord
 from discord.ext import commands, tasks
-from discord import app_commands
-import asyncio
 import logging
-from typing import Dict, Any, List, Optional, Union, cast
+from typing import Dict, Any, List, Optional, cast, Tuple, Union, Mapping
 from datetime import datetime
 import json
 import os
@@ -18,6 +16,9 @@ class GZCTFNotificationBot(commands.Bot):
     """Discord bot for GZCTF notifications"""
     
     def __init__(self, config: BotConfig, gzctf_client: GZCTFClient):
+        # Auth refresh strategy constants
+        self.AUTH_CHECK_INTERVAL: int = 100
+        self.AUTH_TIME_INTERVAL: int = 3600
         intents = discord.Intents.default()
         intents.message_content = True
         
@@ -194,6 +195,73 @@ class GZCTFNotificationBot(commands.Bot):
                 self.events_disabled_due_to_auth = True
                 self.save_state()
 
+    def _get_bot_member_and_role(self, guild: discord.Guild) -> Tuple[Optional[discord.Member], Optional[discord.Role]]:
+        """Return the bot's guild member and its highest role (excluding @everyone), if any."""
+        bot_member = guild.me
+        bot_role = None
+        if bot_member and bot_member.roles:
+            non_everyone_roles = [r for r in bot_member.roles if r != guild.default_role]
+            if non_everyone_roles:
+                bot_role = max(non_everyone_roles, key=lambda r: r.position)
+        return bot_member, bot_role
+
+    def _build_event_overwrites(self, guild: discord.Guild, allowed_roles: List[discord.Role]) -> Dict[Union[discord.Role, discord.Member, discord.Object], discord.PermissionOverwrite]:
+        """Build permission overwrites for the private event channel."""
+        overwrites: Dict[Union[discord.Role, discord.Member, discord.Object], discord.PermissionOverwrite] = {}
+        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+        bot_member, bot_role = self._get_bot_member_and_role(guild)
+        if bot_member:
+            overwrites[bot_member] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        if bot_role:
+            overwrites[bot_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        for role in allowed_roles:
+            overwrites[role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        return overwrites
+
+    async def _apply_event_channel_overwrites(self, channel: discord.TextChannel, guild: discord.Guild, allowed_roles: List[discord.Role]) -> None:
+        """Apply privacy and access overwrites to the event channel."""
+        bot_member, bot_role = self._get_bot_member_and_role(guild)
+        await channel.set_permissions(guild.default_role, view_channel=False)
+        if bot_member:
+            await channel.set_permissions(
+                bot_member,
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        if bot_role:
+            await channel.set_permissions(
+                bot_role,
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+        for role in allowed_roles:
+            await channel.set_permissions(
+                role,
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                read_message_history=True
+            )
+
     async def _ensure_notification_channel(self, guild: discord.Guild, name: str) -> Optional[discord.TextChannel]:
         """Create or fetch the notification channel if notices are enabled."""
         channel = discord.utils.get(guild.text_channels, name=name)
@@ -241,36 +309,7 @@ class GZCTFNotificationBot(commands.Bot):
         channel = discord.utils.get(guild.text_channels, name=name)
         allowed_roles = self._get_allowed_roles_for_event(guild)
 
-        # Build permission overwrites
-        overwrites: dict = {}
-        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
-        bot_member = guild.me
-        bot_role = None
-        if bot_member and bot_member.roles:
-            non_everyone_roles = [r for r in bot_member.roles if r != guild.default_role]
-            if non_everyone_roles:
-                bot_role = max(non_everyone_roles, key=lambda r: r.position)
-        if bot_member:
-            overwrites[bot_member] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                embed_links=True,
-                read_message_history=True
-            )
-        if bot_role:
-            overwrites[bot_role] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                embed_links=True,
-                read_message_history=True
-            )
-        for role in allowed_roles:
-            overwrites[role] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                embed_links=True,
-                read_message_history=True
-            )
+        overwrites = self._build_event_overwrites(guild, allowed_roles)
 
         if not channel:
             try:
@@ -284,31 +323,7 @@ class GZCTFNotificationBot(commands.Bot):
                 return None
         else:
             try:
-                await channel.set_permissions(guild.default_role, view_channel=False)
-                if bot_member:
-                    await channel.set_permissions(
-                        bot_member,
-                        view_channel=True,
-                        send_messages=True,
-                        embed_links=True,
-                        read_message_history=True
-                    )
-                if bot_role:
-                    await channel.set_permissions(
-                        bot_role,
-                        view_channel=True,
-                        send_messages=True,
-                        embed_links=True,
-                        read_message_history=True
-                    )
-                for role in allowed_roles:
-                    await channel.set_permissions(
-                        role,
-                        view_channel=True,
-                        send_messages=True,
-                        embed_links=True,
-                        read_message_history=True
-                    )
+                await self._apply_event_channel_overwrites(channel, guild, allowed_roles)
                 logger.info("Ensured event channel is private with correct permissions")
             except discord.Forbidden:
                 logger.error("Missing permissions to update event channel overwrites")
@@ -319,6 +334,7 @@ class GZCTFNotificationBot(commands.Bot):
 
         # Final verification: ensure the bot can view the channel
         try:
+            bot_member, bot_role = self._get_bot_member_and_role(guild)
             perms = channel.permissions_for(bot_member) if bot_member else None
             if not (perms and perms.view_channel):
                 logger.warning("Bot does not have access to the event channel yet; attempting to grant access again")
@@ -335,8 +351,8 @@ class GZCTFNotificationBot(commands.Bot):
         """Poll for new notifications from GZCTF"""
         try:
             # Proactively re-authenticate periodically to ensure token is always fresh
-            auth_check_interval = 100  # Re-authenticate after every 100 polls (increased from 5)
-            auth_time_interval = 3600  # Re-authenticate after 1 hour regardless of poll count
+            auth_check_interval = self.AUTH_CHECK_INTERVAL
+            auth_time_interval = self.AUTH_TIME_INTERVAL
             current_time = datetime.now().timestamp()
             
             # Create static variables if they don't exist
