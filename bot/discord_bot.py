@@ -130,16 +130,129 @@ class GZCTFNotificationBot(commands.Bot):
         # Create or get event channel only if events are enabled
         if self.enable_events and not self.events_disabled_due_to_auth:
             event_channel = discord.utils.get(guild.text_channels, name=event_channel_name)
+
+            # Build permission overwrites for a private event channel
+            allowed_role_ids_env = os.getenv("EVENT_ALLOWED_ROLE_IDS", "").strip()
+            allowed_role_names_env = os.getenv("EVENT_ALLOWED_ROLE_NAMES", "").strip()
+            allowed_role_ids = set()
+            if allowed_role_ids_env:
+                for part in allowed_role_ids_env.split(','):
+                    part = part.strip()
+                    if part.isdigit():
+                        try:
+                            allowed_role_ids.add(int(part))
+                        except:
+                            pass
+            allowed_roles = []
+            # Find roles by ID first
+            for role_id in allowed_role_ids:
+                role = guild.get_role(role_id)
+                if role:
+                    allowed_roles.append(role)
+            # Find roles by name if provided
+            if allowed_role_names_env:
+                for name in [n.strip() for n in allowed_role_names_env.split(',') if n.strip()]:
+                    role_by_name = discord.utils.get(guild.roles, name=name)
+                    if role_by_name and role_by_name not in allowed_roles:
+                        allowed_roles.append(role_by_name)
+
+            # Default to Administrator roles if nothing configured
+            if not allowed_roles:
+                allowed_roles = [r for r in guild.roles if r.permissions.administrator]
+
+            overwrites: dict = {}
+            # Hide from everyone by default
+            overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+            # Ensure the bot can access and post in the channel
+            bot_member = guild.me
+            bot_role = None
+            if bot_member and bot_member.roles:
+                # Prefer the bot's highest role (not @everyone)
+                non_everyone_roles = [r for r in bot_member.roles if r != guild.default_role]
+                if non_everyone_roles:
+                    bot_role = max(non_everyone_roles, key=lambda r: r.position)
+            if bot_member:
+                overwrites[bot_member] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    embed_links=True,
+                    read_message_history=True
+                )
+            if bot_role:
+                overwrites[bot_role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    embed_links=True,
+                    read_message_history=True
+                )
+            # Grant access to allowed roles
+            for role in allowed_roles:
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    embed_links=True,
+                    read_message_history=True
+                )
+
             if not event_channel:
                 try:
-                    event_channel = await guild.create_text_channel(event_channel_name)
+                    event_channel = await guild.create_text_channel(event_channel_name, overwrites=overwrites)
                     logger.info(f"Created event channel: {event_channel.name}")
                 except discord.Forbidden:
-                    logger.error(f"Missing permissions to create event channel - events will be disabled")
-            
+                    logger.error("Missing permissions to create event channel - events will be disabled")
+                except Exception as e:
+                    logger.error(f"Failed to create event channel: {e}")
+            else:
+                # Ensure existing channel is private with correct permissions
+                try:
+                    # Apply @everyone deny
+                    await event_channel.set_permissions(guild.default_role, view_channel=False)
+                    # Apply bot permissions
+                    if bot_member:
+                        await event_channel.set_permissions(
+                            bot_member,
+                            view_channel=True,
+                            send_messages=True,
+                            embed_links=True,
+                            read_message_history=True
+                        )
+                    if bot_role:
+                        await event_channel.set_permissions(
+                            bot_role,
+                            view_channel=True,
+                            send_messages=True,
+                            embed_links=True,
+                            read_message_history=True
+                        )
+                    # Apply allowed roles
+                    for role in allowed_roles:
+                        await event_channel.set_permissions(
+                            role,
+                            view_channel=True,
+                            send_messages=True,
+                            embed_links=True,
+                            read_message_history=True
+                        )
+                    logger.info("Ensured event channel is private with correct permissions")
+                except discord.Forbidden:
+                    logger.error("Missing permissions to update event channel overwrites")
+                except Exception as e:
+                    logger.error(f"Failed to update event channel permissions: {e}")
+
             if event_channel:
                 self.event_channel_id = event_channel.id
                 logger.info(f"Using event channel: {event_channel.name} (ID: {event_channel.id})")
+                # Final verification: ensure the bot can view the channel
+                try:
+                    perms = event_channel.permissions_for(bot_member) if bot_member else None
+                    if not (perms and perms.view_channel):
+                        logger.warning("Bot does not have access to the event channel yet; attempting to grant access again")
+                        if bot_member:
+                            await event_channel.set_permissions(bot_member, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
+                        if bot_role:
+                            await event_channel.set_permissions(bot_role, view_channel=True, send_messages=True, embed_links=True, read_message_history=True)
+                except Exception:
+                    pass
             else:
                 logger.warning("Event channel not found and could not be created. Events will not be sent.")
         else:

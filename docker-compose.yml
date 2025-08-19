@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   gzctf-bot:
     container_name: gzctf-discord-bot
