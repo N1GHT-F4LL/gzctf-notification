@@ -8,6 +8,7 @@ then pushes them to a Discord channel in real-time.
 
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
 import os
 from dotenv import load_dotenv
@@ -24,12 +25,35 @@ config = load_config()
 
 # Configure logging
 log_level = logging.DEBUG if config.debug else logging.INFO
+
+# Determine log directory (container: /app/logs; local: ./logs; env override: LOG_DIR)
+def _resolve_log_dir() -> str:
+    candidates = []
+    env_log_dir = os.getenv('LOG_DIR', '').strip()
+    if env_log_dir:
+        candidates.append(env_log_dir)
+    candidates.extend([
+        os.path.join('/app', 'logs'),
+        os.path.join(os.getcwd(), 'logs'),
+        os.getcwd(),
+    ])
+    for path in candidates:
+        try:
+            os.makedirs(path, exist_ok=True)
+            return path
+        except Exception:
+            continue
+    return os.getcwd()
+
+log_dir = _resolve_log_dir()
+log_file_path = os.path.join(log_dir, 'gzctf_bot.log')
+
 logging.basicConfig(
     level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(os.path.join('gzctf_bot.log'))
+        RotatingFileHandler(log_file_path, maxBytes=5_000_000, backupCount=3, encoding='utf-8')
     ]
 )
 

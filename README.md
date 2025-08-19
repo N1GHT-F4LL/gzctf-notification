@@ -167,7 +167,8 @@ The bot will:
    - **Private event channel**: Created only if ENABLE_EVENTS=true
 4. Start polling for notifications every 30 seconds (configurable)
 5. Send formatted notifications to the appropriate Discord channels
-6. Automatically refresh authentication when needed:
+6. Write logs to `logs/gzctf_bot.log` locally or `/app/logs/gzctf_bot.log` in Docker.
+7. Automatically refresh authentication when needed:
    - Every 30 polling cycles (approximately 15 minutes with default settings)
    - After 1 hour regardless of polling count
    - When token validation fails
@@ -297,7 +298,9 @@ Team: Team Beta
 
 ### Logs
 
-The bot creates a log file `gzctf_bot.log` with detailed information about:
+By default, logs are written to `./logs/gzctf_bot.log` (local runs) or `/app/logs/gzctf_bot.log` (Docker). You can override the folder with `LOG_DIR`.
+
+Log file uses rotation (5 MB, 3 backups). It includes detailed information about:
 - Authentication status
 - API requests and responses
 - Discord message sending

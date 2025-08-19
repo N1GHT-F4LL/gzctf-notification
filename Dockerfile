@@ -25,7 +25,7 @@ COPY bot/ ./bot/
 RUN useradd -m -u 1000 bot
 
 # Create directories for persistent data and set ownership
-RUN mkdir -p /app/data /app/logs && chown -R bot:bot /app
+RUN mkdir -p /app/logs && chown -R bot:bot /app
 
 USER bot
 
