@@ -137,7 +137,15 @@ class NotificationFormatter:
             return f"🛑 {user_info} stopped {challenge}"
         
         elif event_type == "CheatDetected":
-            return f"🚨 Suspicious activity - {user_info}"
+            # Prefer explicit, descriptive message using values if available
+            if values and len(values) >= 3:
+                challenge = values[0]
+                offender_team = values[1]
+                victim_team = values[2]
+                # Title focuses on challenge context
+                return f"🚨 Cheat detected in {challenge}"
+            # Fallback to generic alert with user/team info
+            return f"🚨 Cheat Alert - {user_info}"
         
         # Fallback titles
         titles = {
@@ -210,7 +218,14 @@ class NotificationFormatter:
             return f"Container ID: `{container_id}`"
         
         elif event_type == "CheatDetected" and values:
-            details = ' '.join(values)
+            # Expecting values as [challenge, offender_team, victim_team]
+            if len(values) >= 3:
+                challenge = values[0]
+                offender_team = values[1]
+                victim_team = values[2]
+                return f"Team {offender_team} used {victim_team}'s flag."
+            # Fallback to a compact joined representation if structure is unknown
+            details = '-'.join(values)
             return f"Details: {details}"
         
         return ""

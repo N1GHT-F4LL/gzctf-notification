@@ -30,4 +30,4 @@ RUN mkdir -p /app/logs && chown -R bot:bot /app
 USER bot
 
 # Run the bot
-CMD ["python", "bot/main.py"] 
+CMD ["python", "bot/main.py"]
